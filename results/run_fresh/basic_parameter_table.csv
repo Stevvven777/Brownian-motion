@@ -1,2 +1,0 @@
-drop_id,radius_um,diffusion_m2_s,k_B_J_K,k_B_ratio_to_SI,cunningham_factor,eta_slip_corrected_pa_s,drift_velocity_um_s,msd_fit_r2,fit_point_count
-drop1,0.1905848784021599,1.8544386158844853e-11,2.887281803740467e-24,0.2091249697599076,1.4246281685577626,1.2705069574978097e-05,0.07962567739248033,0.9984540372231745,20

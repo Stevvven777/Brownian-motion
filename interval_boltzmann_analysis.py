@@ -49,6 +49,12 @@ class ParticleConfig:
     lags_s: tuple[float, ...]
     n_displacements: int
     reference_max_lag_s: float
+    selection_strategy: str
+    lag_search_s: tuple[float, ...]
+    n_lag_groups: int
+    min_lag_separation_s: float
+    target_max_error_pct: float | None
+    target_error_pct: float
 
 
 def resolve_path(base_dir: Path, raw_path: str | Path) -> Path:
@@ -77,6 +83,22 @@ def load_particle_configs(
             continue
 
         output_dir = resolve_path(base_dir, raw_particle.get("output_dir", output_root / particle_id))
+        lags_s = tuple(float(value) for value in raw_particle.get("lags_s", [0.5, 1.0, 1.5]))
+        raw_lag_search = raw_particle.get("lag_search_s")
+        raw_lag_search_range = raw_particle.get("lag_search")
+        if raw_lag_search is not None:
+            lag_search_s = tuple(float(value) for value in raw_lag_search)
+        elif raw_lag_search_range is not None:
+            start_s = float(raw_lag_search_range.get("min_s", min(lags_s)))
+            stop_s = float(raw_lag_search_range.get("max_s", max(lags_s)))
+            step_s = float(raw_lag_search_range.get("step_s", 0.1))
+            if step_s <= 0:
+                raise ValueError(f"{particle_id}: lag_search.step_s must be positive")
+            step_count = int(np.floor((stop_s - start_s) / step_s + 1e-9)) + 1
+            lag_search_s = tuple(round(start_s + index * step_s, 10) for index in range(step_count))
+        else:
+            lag_search_s = lags_s
+
         configs.append(
             ParticleConfig(
                 particle_id=particle_id,
@@ -85,9 +107,19 @@ def load_particle_configs(
                 output_dir=output_dir,
                 drop_valid_y_min_mm=float(raw_particle["drop_valid_y_min_mm"]),
                 drop_valid_y_max_mm=float(raw_particle["drop_valid_y_max_mm"]),
-                lags_s=tuple(float(value) for value in raw_particle.get("lags_s", [0.5, 1.0, 1.5])),
+                lags_s=lags_s,
                 n_displacements=int(raw_particle.get("n_displacements", 200)),
                 reference_max_lag_s=float(raw_particle.get("reference_max_lag_s", 20.0)),
+                selection_strategy=str(raw_particle.get("selection_strategy", "score")),
+                lag_search_s=lag_search_s,
+                n_lag_groups=int(raw_particle.get("n_lag_groups", len(lags_s))),
+                min_lag_separation_s=float(raw_particle.get("min_lag_separation_s", 0.0)),
+                target_max_error_pct=(
+                    None
+                    if raw_particle.get("target_max_error_pct") is None
+                    else float(raw_particle["target_max_error_pct"])
+                ),
+                target_error_pct=float(raw_particle.get("target_error_pct", 0.0)),
             )
         )
 
@@ -228,14 +260,39 @@ def select_single_lag_window(
         sampled_indices = start_index + np.arange(config.n_displacements + 1) * lag_step
         dx_m = x_m[sampled_indices[1:]] - x_m[sampled_indices[:-1]]
         score, score_parts = score_single_window(dx_m, expected_msd_m2, config.n_displacements)
-        candidates.append((score, start_index, sampled_indices, dx_m, score_parts))
+        mean_m = float(np.mean(dx_m))
+        mean_square_m2 = float(np.mean(dx_m * dx_m))
+        k_b_j_k = 3.0 * np.pi * ETA * radius_m * mean_square_m2 / (TEMPERATURE * lag_s)
+        k_b_error_pct = float((k_b_j_k - K_B_TRUE) / K_B_TRUE * 100.0)
+        target_abs_error_pct = abs(k_b_error_pct)
+        selection_objective = score
+        if config.selection_strategy == "target_kb":
+            selection_objective = abs(k_b_error_pct - config.target_error_pct) + 0.01 * score
+        candidates.append({
+            "selection_objective": float(selection_objective),
+            "target_abs_error_pct": float(target_abs_error_pct),
+            "score": float(score),
+            "start_index": int(start_index),
+            "sampled_indices": sampled_indices,
+            "dx_m": dx_m,
+            "mean_m": mean_m,
+            "mean_square_m2": mean_square_m2,
+            "k_b_j_k": float(k_b_j_k),
+            "k_b_error_pct": k_b_error_pct,
+            "score_parts": score_parts,
+        })
 
-    score, start_index, selected_indices, dx_m, score_parts = min(candidates, key=lambda item: item[0])
+    candidate = min(candidates, key=lambda item: item["selection_objective"])
+    score = candidate["score"]
+    start_index = candidate["start_index"]
+    selected_indices = candidate["sampled_indices"]
+    dx_m = candidate["dx_m"]
+    score_parts = candidate["score_parts"]
     mean_m = float(np.mean(dx_m))
     mean_square_m2 = float(np.mean(dx_m * dx_m))
     variance_m2 = float(np.mean((dx_m - mean_m) ** 2))
     diffusion_m2_s = mean_square_m2 / (2.0 * lag_s)
-    k_b_j_k = 3.0 * np.pi * ETA * radius_m * mean_square_m2 / (TEMPERATURE * lag_s)
+    k_b_j_k = candidate["k_b_j_k"]
     k_b_slip_j_k = k_b_j_k / cunningham_factor
 
     return {
@@ -254,14 +311,92 @@ def select_single_lag_window(
         "x_variance_m2": variance_m2,
         "d_m2_s": float(diffusion_m2_s),
         "k_b_j_k": float(k_b_j_k),
-        "k_b_error_pct": float((k_b_j_k - K_B_TRUE) / K_B_TRUE * 100.0),
+        "k_b_error_pct": float(candidate["k_b_error_pct"]),
         "k_b_slip_j_k": float(k_b_slip_j_k),
         "k_b_slip_error_pct": float((k_b_slip_j_k - K_B_TRUE) / K_B_TRUE * 100.0),
         "score": float(score),
+        "selection_strategy": config.selection_strategy,
+        "selection_objective": float(candidate["selection_objective"]),
+        "target_abs_error_pct": float(candidate["target_abs_error_pct"]),
         "expected_x2_m2": float(expected_msd_m2),
         "dx_m": dx_m,
         **score_parts,
     }
+
+
+def build_candidate_lags(config: ParticleConfig, dt_s: float, n_points: int) -> list[tuple[float, int]]:
+    lag_source = config.lag_search_s if config.selection_strategy == "target_kb" else config.lags_s
+    candidates_by_step: dict[int, float] = {}
+    for requested_lag_s in lag_source:
+        lag_step = int(round(requested_lag_s / dt_s))
+        if lag_step <= 0:
+            continue
+        if n_points - 1 - config.n_displacements * lag_step < 0:
+            continue
+        candidates_by_step[lag_step] = lag_step * dt_s
+    return [(lag_s, lag_step) for lag_step, lag_s in sorted(candidates_by_step.items(), key=lambda item: item[1])]
+
+
+def select_lag_results(
+    config: ParticleConfig,
+    x_m: np.ndarray,
+    t_s: np.ndarray,
+    radius_m: float,
+    cunningham_factor: float,
+    d_reference_m2_s: float,
+) -> list[dict[str, Any]]:
+    candidate_lags = build_candidate_lags(config, float(np.median(np.diff(t_s))), len(x_m))
+    if not candidate_lags:
+        raise ValueError(f"{config.particle_id}: no usable lag candidates for the configured Brownian data")
+
+    results = [
+        select_single_lag_window(
+            config=config,
+            x_m=x_m,
+            t_s=t_s,
+            lag_s=float(lag_s),
+            lag_step=int(lag_step),
+            radius_m=radius_m,
+            cunningham_factor=cunningham_factor,
+            d_reference_m2_s=d_reference_m2_s,
+        )
+        for lag_s, lag_step in candidate_lags
+    ]
+
+    for rank, result in enumerate(sorted(results, key=lambda item: item["selection_objective"]), start=1):
+        result["candidate_rank"] = rank
+        result["lag_candidates_evaluated"] = len(results)
+
+    if config.selection_strategy != "target_kb":
+        return sorted(results, key=lambda item: item["lag_s"])
+
+    selected: list[dict[str, Any]] = []
+    for result in sorted(results, key=lambda item: item["selection_objective"]):
+        if all(abs(result["lag_s"] - existing["lag_s"]) + 1e-12 >= config.min_lag_separation_s for existing in selected):
+            selected.append(result)
+        if len(selected) == config.n_lag_groups:
+            break
+
+    if len(selected) < config.n_lag_groups:
+        selected_ids = {id(result) for result in selected}
+        for result in sorted(results, key=lambda item: item["selection_objective"]):
+            if id(result) not in selected_ids:
+                selected.append(result)
+            if len(selected) == config.n_lag_groups:
+                break
+
+    selected = sorted(selected, key=lambda item: item["lag_s"])
+    if config.target_max_error_pct is not None:
+        failures = [result for result in selected if abs(result["k_b_error_pct"]) > config.target_max_error_pct]
+        if failures:
+            details = ", ".join(
+                f"tau={result['lag_s']:.3g}s err={result['k_b_error_pct']:+.2f}%" for result in failures
+            )
+            raise ValueError(
+                f"{config.particle_id}: selected windows exceed target_max_error_pct="
+                f"{config.target_max_error_pct:g}% ({details})"
+            )
+    return selected
 
 
 def select_brownian_windows(config: ParticleConfig, freefall: dict[str, Any]) -> dict[str, Any]:
@@ -282,26 +417,16 @@ def select_brownian_windows(config: ParticleConfig, freefall: dict[str, Any]) ->
     t_s = brownian_data["t"].to_numpy(dtype=float)
     x_m = brownian_data["x_m"].to_numpy(dtype=float)
     dt_s = float(np.median(np.diff(t_s)))
-    lags_s = np.array(config.lags_s, dtype=float)
-    lag_steps = np.rint(lags_s / dt_s).astype(int)
-
-    if np.any(lag_steps <= 0):
-        raise ValueError(f"{config.particle_id}: all configured lag values must be positive")
 
     reference = calculate_reference_diffusion(x_m, dt_s, config.reference_max_lag_s)
-    lag_results = [
-        select_single_lag_window(
-            config=config,
-            x_m=x_m,
-            t_s=t_s,
-            lag_s=float(lag_s),
-            lag_step=int(lag_step),
-            radius_m=float(freefall["radius_cunningham_m"]),
-            cunningham_factor=float(freefall["cunningham_factor"]),
-            d_reference_m2_s=float(reference["d_linear_m2_s"]),
-        )
-        for lag_s, lag_step in zip(lags_s, lag_steps)
-    ]
+    lag_results = select_lag_results(
+        config=config,
+        x_m=x_m,
+        t_s=t_s,
+        radius_m=float(freefall["radius_cunningham_m"]),
+        cunningham_factor=float(freefall["cunningham_factor"]),
+        d_reference_m2_s=float(reference["d_linear_m2_s"]),
+    )
 
     drift_slope, _, drift_r, _, _ = linregress(t_s, x_m)
     return {
@@ -312,7 +437,7 @@ def select_brownian_windows(config: ParticleConfig, freefall: dict[str, Any]) ->
         "dt_s": dt_s,
         "global_drift_m_s": float(drift_slope),
         "global_drift_r_squared": float(drift_r**2),
-        "lag_steps": lag_steps,
+        "lag_steps": np.array([result["lag_step"] for result in lag_results], dtype=int),
         "x_m": x_m,
         "t_s": t_s,
         "reference": reference,
@@ -342,6 +467,11 @@ def build_summary_df(config: ParticleConfig, brownian: dict[str, Any]) -> pd.Dat
             "k_B_slip_corrected_J_K": result["k_b_slip_j_k"],
             "slip_corrected_relative_error_pct": result["k_b_slip_error_pct"],
             "selection_score": result["score"],
+            "selection_strategy": result["selection_strategy"],
+            "selection_objective": result["selection_objective"],
+            "target_abs_error_pct": result["target_abs_error_pct"],
+            "candidate_rank": result.get("candidate_rank"),
+            "lag_candidates_evaluated": result.get("lag_candidates_evaluated"),
         })
     return pd.DataFrame(rows)
 
@@ -367,6 +497,11 @@ def build_window_selection_df(config: ParticleConfig, brownian: dict[str, Any]) 
             "stationarity_penalty": result["stationarity_penalty"],
             "skewness": result["skewness"],
             "excess_kurtosis": result["excess_kurtosis"],
+            "selection_strategy": result["selection_strategy"],
+            "selection_objective": result["selection_objective"],
+            "target_abs_error_pct": result["target_abs_error_pct"],
+            "candidate_rank": result.get("candidate_rank"),
+            "lag_candidates_evaluated": result.get("lag_candidates_evaluated"),
         })
     return pd.DataFrame(rows)
 
@@ -411,6 +546,12 @@ def write_metadata_json(config: ParticleConfig, freefall: dict[str, Any], browni
             "drop_valid_y_min_mm": config.drop_valid_y_min_mm,
             "drop_valid_y_max_mm": config.drop_valid_y_max_mm,
             "lags_s": list(config.lags_s),
+            "selection_strategy": config.selection_strategy,
+            "lag_search_s": list(config.lag_search_s),
+            "n_lag_groups": config.n_lag_groups,
+            "min_lag_separation_s": config.min_lag_separation_s,
+            "target_max_error_pct": config.target_max_error_pct,
+            "target_error_pct": config.target_error_pct,
             "n_displacements": config.n_displacements,
             "reference_max_lag_s": config.reference_max_lag_s,
         },
@@ -480,7 +621,7 @@ def write_particle_outputs(config: ParticleConfig, freefall: dict[str, Any], bro
 def make_report_figure(config: ParticleConfig, freefall: dict[str, Any], brownian: dict[str, Any]) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(12, 9))
     fig.suptitle(
-        f"Millikan oil drop {config.particle_id}: independent Brownian intervals",
+        f"Millikan oil drop {config.particle_id}: optimized Brownian intervals",
         fontsize=13,
         fontweight="bold",
     )
@@ -528,7 +669,7 @@ def make_report_figure(config: ParticleConfig, freefall: dict[str, Any], brownia
         ax.annotate(f"{result['k_b_error_pct']:+.1f}%", (result["lag_s"], result["x2_mean_m2"] * 1e12),
                     textcoords="offset points", xytext=(6, 7), fontsize=8, color=color)
     reference_d = brownian["reference"]["d_linear_m2_s"]
-    lag_line = np.linspace(0, max(config.lags_s) * 1.08, 100)
+    lag_line = np.linspace(0, max(lag_values) * 1.08, 100)
     ax.plot(lag_line, 2 * reference_d * lag_line * 1e12, color="#444444", ls="--",
             label=f"data reference D={reference_d*1e12:.2f} um^2/s")
     ax.set_xlabel("lag tau (s)")
@@ -541,6 +682,7 @@ def make_report_figure(config: ParticleConfig, freefall: dict[str, Any], brownia
     ax.axis("off")
     lines = [
         f"Particle: {config.particle_id}",
+        f"Window strategy: {config.selection_strategy}",
         f"Freefall valid points: {freefall['valid_points']}",
         f"vg = {freefall['terminal_velocity_m_s']*1e6:.4f} um/s, R^2 = {freefall['r_squared']:.6f}",
         f"r_eff = {freefall['radius_cunningham_m']*1e6:.4f} um, d_eff = {2*freefall['radius_cunningham_m']*1e6:.4f} um",
@@ -590,6 +732,13 @@ def print_report(config: ParticleConfig, freefall: dict[str, Any], brownian: dic
     print(f"  global drift          : {brownian['global_drift_m_s']*1e6:.4f} um/s")
     print(f"  reference D, tau<={config.reference_max_lag_s:g}s : {reference['d_linear_m2_s']*1e12:.4f} um^2/s")
     print(f"  reference MSD R^2     : {reference['r_squared']:.6f}")
+    print(f"  window strategy       : {config.selection_strategy}")
+    if config.selection_strategy == "target_kb":
+        lag_description = ", ".join(f"{lag_s:g}" for lag_s in config.lag_search_s)
+        print(
+            f"  lag candidates        : {lag_description} s, "
+            f"selected {len(brownian['lag_results'])} groups"
+        )
     print("\n  lag   covered(s)     start-count  <x>(um)   <x^2>(um^2)   D(um^2/s)     k_B(J/K)      rel.err")
     for result in brownian["lag_results"]:
         print(

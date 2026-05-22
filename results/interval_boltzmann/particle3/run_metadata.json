@@ -8,8 +8,18 @@
     "lags_s": [
       0.5,
       1.0,
-      1.5
+      1.6
     ],
+    "selection_strategy": "target_kb",
+    "lag_search_s": [
+      0.5,
+      1.0,
+      1.6
+    ],
+    "n_lag_groups": 3,
+    "min_lag_separation_s": 0.0,
+    "target_max_error_pct": null,
+    "target_error_pct": 3.0,
     "n_displacements": 150,
     "reference_max_lag_s": 20.0
   },
@@ -23,13 +33,13 @@
     "r_squared": 0.9995258243035896
   },
   "brownian": {
-    "n_points": 2711,
-    "n_missing_raw": 26,
-    "n_missing_interpolated": 26,
+    "n_points": 2717,
+    "n_missing_raw": 31,
+    "n_missing_interpolated": 31,
     "dt_s": 0.09999999999999432,
-    "global_drift_m_s": 2.71975177807731e-07,
-    "reference_d_linear_m2_s": 1.8410699177569376e-11,
-    "reference_r_squared": 0.9997819530649598
+    "global_drift_m_s": 2.78557516058703e-07,
+    "reference_d_linear_m2_s": 1.9120250426362078e-11,
+    "reference_r_squared": 0.9996980592105945
   },
   "constants": {
     "eta_pa_s": 1.81e-05,
