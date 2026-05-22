@@ -1,0 +1,2 @@
+drop_id,fall_time_s,frame_count,vertical_speed_um_s,terminal_velocity_m_s,radius_m,radius_um,cunningham_factor,eta_air_pa_s,eta_slip_corrected_pa_s,fit_r2
+drop1,67.8,679,7.69858160350248,7.69858160350248e-06,2.3138901614172207e-07,0.23138901614172208,1.3497474046959348,1.81e-05,1.3409916505138595e-05,0.8341851523952304

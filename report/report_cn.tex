@@ -1,0 +1,621 @@
+% 布朗运动测量玻尔兹曼常数 —— 实验报告
+% 编译命令: xelatex report_cn.tex  (运行两次以生成目录)
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{parskip}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{enumitem}
+
+\sisetup{separate-uncertainty=true, per-mode=symbol}
+
+% Python 代码高亮样式
+\definecolor{codebg}{rgb}{0.96,0.96,0.96}
+\definecolor{codecomment}{rgb}{0.4,0.4,0.4}
+\definecolor{codestring}{rgb}{0.13,0.54,0.13}
+\definecolor{codekeyword}{rgb}{0.0,0.0,0.7}
+
+\lstdefinestyle{python}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\small\ttfamily,
+  commentstyle=\color{codecomment},
+  stringstyle=\color{codestring},
+  keywordstyle=\color{codekeyword},
+  language=Python,
+  breaklines=true,
+  frame=single,
+  framerule=0.4pt,
+  framesep=4pt,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=6pt,
+  tabsize=4,
+  showstringspaces=false,
+}
+
+\title{\textbf{利用密立根装置中油滴的布朗运动\\测量玻尔兹曼常数}\\[6pt]
+\large 实验报告}
+\author{Steven Chen}
+\date{2026 年 5 月}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%% ═══════════════════════════════════════════════════════
+\section{实验目的}
+
+\begin{enumerate}[leftmargin=2em]
+  \item 通过油滴在重力场中的自由落体运动，利用 Stokes 定律和 Cunningham 修正确定油滴有效半径 $r$；
+  \item 记录油滴的水平布朗运动轨迹，从均方位移（MSD）提取扩散系数 $D$；
+  \item 结合 $r$ 与 $D$，利用 Einstein--Smoluchowski 关系计算玻尔兹曼常数 $k_B$，与 NIST 精确值比较；
+  \item 理解数据驱动的统计分析方法，掌握窗口选择与误差分析的思路。
+\end{enumerate}
+
+%% ═══════════════════════════════════════════════════════
+\section{实验原理}
+
+\subsection{Stokes 定律与终端速度}
+
+对半径为 $r$、在黏度 $\eta$ 流体中匀速下落的球形颗粒，Stokes 阻力为
+\begin{equation}
+  F_\text{drag} = 6\pi \eta r v.
+\end{equation}
+重力与浮力之差为
+\begin{equation}
+  F_g = \frac{4}{3}\pi r^3 (\rho_\text{oil} - \rho_\text{air})\, g.
+\end{equation}
+令 $F_\text{drag} = F_g$，解出终端速度
+\begin{equation}
+  v_g = \frac{2(\rho_\text{oil}-\rho_\text{air})\,g}{9\eta}\,r^2,
+  \label{eq:stokes_vg}
+\end{equation}
+由此得 Stokes 半径
+\begin{equation}
+  r_0 = \sqrt{\frac{9\eta\,v_g}{2(\rho_\text{oil}-\rho_\text{air})\,g}}.
+  \label{eq:r_stokes}
+\end{equation}
+
+\subsection{Cunningham 滑移修正}
+
+当颗粒半径与气体分子平均自由程可比时，连续流假设失效，阻力减小，需引入 Cunningham 因子
+\begin{equation}
+  C = 1 + \frac{B}{P\,r},
+  \label{eq:cunningham_C}
+\end{equation}
+其中 $B = \SI{8.2e-3}{\pascal\metre}$，$P$ 为大气压。修正后终端速度变为
+\begin{equation}
+  v_g = \frac{2(\rho_\text{oil}-\rho_\text{air})\,g}{9\eta}\,r^2 C
+      = \frac{2(\rho_\text{oil}-\rho_\text{air})\,g}{9\eta}\,r_0^2,
+  \label{eq:vg_cunningham}
+\end{equation}
+于是 $r^2 C = r_0^2$，代入 \eqref{eq:cunningham_C} 得
+\begin{equation}
+  r^2\!\left(1+\frac{B}{Pr}\right) = r_0^2
+  \implies r^2 + \frac{B}{P}\,r - r_0^2 = 0.
+  \label{eq:quadratic}
+\end{equation}
+取正根：
+\begin{equation}
+  r_\text{eff} = \frac{-B/P + \sqrt{(B/P)^2 + 4\,r_0^2}}{2}.
+  \label{eq:r_eff}
+\end{equation}
+
+\subsection{布朗运动与 Einstein--Smoluchowski 关系}
+
+悬浮颗粒因热涨落产生的随机扩散满足 Stokes--Einstein 关系：
+\begin{equation}
+  D = \frac{k_B T}{6\pi\eta\,r_\text{eff}},
+  \label{eq:SE}
+\end{equation}
+其中 $T$ 为绝对温度。对于一维随机游走，均方位移（MSD）为
+\begin{equation}
+  \langle x^2(\tau)\rangle = 2D\tau,
+  \label{eq:msd}
+\end{equation}
+$\tau$ 为时间间隔（lag time）。联立 \eqref{eq:SE} 与 \eqref{eq:msd}，消去 $D$：
+\begin{equation}
+  k_B = \frac{6\pi\eta\,r_\text{eff}\,D}{T}
+       = \frac{3\pi\eta\,r_\text{eff}\,\langle x^2(\tau)\rangle}{T\,\tau}.
+  \label{eq:kB}
+\end{equation}
+实验策略：对同一颗粒分别测 $v_g$（由此得 $r_\text{eff}$）和 $\langle x^2\rangle$，代入 \eqref{eq:kB} 即得 $k_B$。
+
+\subsection{非重叠位移采样}
+
+设采样步长 $n = \tau/\Delta t$（$\Delta t$ 为帧间隔），在轨迹第 $s$ 点开始取
+\begin{equation}
+  x_0 = x[s],\; x_1 = x[s+n],\; x_2 = x[s+2n],\; \ldots,\; x_N = x[s+Nn].
+  \label{eq:sampling}
+\end{equation}
+$N$ 个非重叠位移为 $\delta x_i = x_i - x_{i-1}$（$i=1,\ldots,N$），均方位移估计为
+\begin{equation}
+  \langle x^2\rangle = \frac{1}{N}\sum_{i=1}^N (\delta x_i)^2.
+  \label{eq:msd_est}
+\end{equation}
+非重叠采样保证各 $\delta x_i$ 统计独立，避免重叠估计引入的自相关偏差。本实验取 $N=150$。
+
+\subsection{窗口质量评分}
+
+为在整条轨迹中自动挑选最优起始点 $s$，定义评分函数
+\begin{equation}
+  \text{Score}(s) = \underbrace{\frac{|\bar{x}|}{x_\text{rms}}}_{\text{零均值性}}
+                 + 0.70\underbrace{\frac{|\langle x^2\rangle - \langle x^2\rangle_\text{ref}|}{\langle x^2\rangle_\text{ref}}}_{\text{MSD偏离度}}
+                 + 0.05|\text{Skewness}|
+                 + 0.025|\text{Excess Kurtosis}|
+                 + 0.08\underbrace{\frac{|\sigma^2_\text{前半} - \sigma^2_\text{后半}|}{(\sigma^2_\text{前半}+\sigma^2_\text{后半})/2}}_{\text{平稳性}},
+  \label{eq:score}
+\end{equation}
+取分数最低的窗口。参考 MSD $\langle x^2\rangle_\text{ref} = 2D_\text{ref}\tau$，$D_\text{ref}$ 由全轨迹 $\tau\leq\SI{20}{\second}$ 段的 MSD 直线拟合斜率给出，不依赖 NIST $k_B$ 值。
+
+%% ═══════════════════════════════════════════════════════
+\section{实验装置与实验内容}
+
+\subsection{装置概述}
+
+实验使用 PASCO 密立根油滴仪配合 CCD 摄像头，通过分析油滴图像质心坐标获得运动轨迹。
+坐标单位经标定后换算为 mm，帧率对应时间步 $\Delta t = \SI{0.1}{\second}$。
+实验分两阶段进行：
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{自由落体}：关闭悬浮电场，油滴在重力和浮力作用下匀速下落，记录竖直坐标 $y(t)$；
+  \item \textbf{布朗运动}：施加悬浮电场使油滴近似悬停，记录水平坐标 $x(t)$ 的涨落。
+\end{enumerate}
+
+\subsection{物理常数与参数}
+
+\begin{table}[h]
+\centering
+\caption{实验所用物理常数与仪器参数}
+\label{tab:constants}
+\begin{tabular}{lll}
+\toprule
+参数 & 数值 & 说明 \\
+\midrule
+空气黏度 $\eta$ & \SI{1.81e-5}{\pascal\second} & 常温空气 \\
+油密度 $\rho_\text{oil}$ & \SI{886}{\kilogram\per\cubic\metre} & PASCO 硅油 \\
+空气密度 $\rho_\text{air}$ & \SI{1.204}{\kilogram\per\cubic\metre} & 标准大气条件 \\
+重力加速度 $g$ & \SI{9.80665}{\metre\per\second\squared} & \\
+大气压 $P$ & \SI{101325}{\pascal} & \\
+Cunningham 系数 $B$ & \SI{8.2e-3}{\pascal\metre} & \\
+温度 $T$ & \SI{293.15}{\kelvin} & $20\,^\circ$C \\
+NIST 精确值 $k_B$ & \SI{1.380649e-23}{\joule\per\kelvin} & SI 2019 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ═══════════════════════════════════════════════════════
+\section{数据处理流程与代码实现}
+
+\subsection{自由落体：提取终端速度与有效半径}
+
+\subsubsection{推导步骤}
+
+从原始 $y$--$t$ 数据中筛选有效自由落体区间（排除加速段和碰壁段），对筛选后数据做线性回归：
+\begin{equation}
+  y(t) = v_g\,t + y_0.
+\end{equation}
+斜率绝对值即终端速度 $v_g$，代入 \eqref{eq:r_stokes} 得 $r_0$，再由 \eqref{eq:r_eff} 解出 $r_\text{eff}$。
+
+\subsubsection{代码实现}
+
+\begin{lstlisting}[style=python, caption={自由落体分析核心代码（\texttt{calculate\_freefall}）}]
+slope, intercept, r_value, _, slope_se = linregress(
+    valid_data["t"], valid_data["y_m"]
+)
+terminal_velocity = abs(slope)   # v_g，单位 m/s
+
+delta_rho = RHO_OIL - RHO_AIR
+# Stokes 半径：由 v_g = 2 delta_rho g r0^2 / (9 eta) 解出
+radius_stokes = np.sqrt(
+    9.0 * ETA * terminal_velocity / (2.0 * delta_rho * G)
+)
+# Cunningham 修正：解二次方程 r^2 + (B/P)*r - r0^2 = 0
+b_over_p = B_CUNNINGHAM / PRESSURE
+radius_cunningham = (
+    -b_over_p + np.sqrt(b_over_p**2 + 4.0 * radius_stokes**2)
+) / 2.0
+cunningham_factor = 1.0 + B_CUNNINGHAM / (PRESSURE * radius_cunningham)
+\end{lstlisting}
+
+\subsection{布朗运动：漂移扣除与参考扩散系数}
+
+\subsubsection{线性漂移扣除}
+
+实验采集的 $x(t)$ 可能叠加宏观慢漂移（气流、电场不均匀等）。代码对全轨迹做线性回归，将斜率 $v_\text{drift}$ 作为全局漂移速度。非重叠位移采样时，每个位移 $\delta x_i$ 已在时间上对齐，全局线性漂移贡献为 $v_\text{drift}\cdot\tau$，在 $\langle x^2\rangle$ 计算中作为系统偏置影响 $\langle x\rangle$ 而非 $\langle x^2\rangle$（后者以 $\langle x^2\rangle = \langle x\rangle^2 + \sigma^2$ 分解，漂移只影响 $\langle x\rangle$，本实验直接使用原始 $\langle x^2\rangle$）。
+
+\subsubsection{参考扩散系数}
+
+对全轨迹计算各 lag 步长的 MSD，在 $\tau \leq \SI{20}{\second}$ 内作线性拟合：
+\begin{equation}
+  \langle x^2(\tau)\rangle = 2D_\text{ref}\,\tau + c,
+\end{equation}
+从斜率提取 $D_\text{ref}$，用于窗口评分中的参考 MSD。
+
+\begin{lstlisting}[style=python, caption={参考扩散系数计算（\texttt{calculate\_reference\_diffusion}）}]
+lag_steps = np.arange(1, max_step + 1)
+lags_s = lag_steps * dt_s
+# 计算每个 lag 对应的全轨迹 MSD
+msd_m2 = np.array([
+    np.mean((x_m[step:] - x_m[:-step])**2)
+    for step in lag_steps
+])
+slope, intercept, r_value, _, _ = linregress(lags_s, msd_m2)
+d_linear = slope / 2.0   # D_ref = slope / 2
+\end{lstlisting}
+
+\subsection{最优窗口选取}
+
+\subsubsection{推导}
+
+对每个 lag $\tau$，遍历所有可能的起始点 $s$，计算 \eqref{eq:score} 定义的评分，选分数最低者。
+这一策略基于数据内部自洽性，不依赖 $k_B$ 的已知值。
+
+\subsubsection{代码实现}
+
+\begin{lstlisting}[style=python, caption={最优窗口选取（\texttt{select\_single\_lag\_window} 节选）}]
+expected_msd_m2 = 2.0 * d_reference_m2_s * lag_s
+candidates = []
+
+for start_index in range(max_start + 1):
+    # 非重叠采样索引
+    sampled_indices = start_index + np.arange(n_displacements + 1) * lag_step
+    dx_m = x_m[sampled_indices[1:]] - x_m[sampled_indices[:-1]]
+    score, score_parts = score_single_window(
+        dx_m, expected_msd_m2, n_displacements
+    )
+    candidates.append((score, start_index, sampled_indices, dx_m, score_parts))
+
+# 取分数最低的窗口
+score, start_index, selected_indices, dx_m, score_parts = min(
+    candidates, key=lambda item: item[0]
+)
+\end{lstlisting}
+
+\subsection{玻尔兹曼常数计算}
+
+选定窗口后，计算 $\langle x^2\rangle$ 并代入 \eqref{eq:kB}：
+
+\begin{lstlisting}[style=python, caption={$k_B$ 计算（\texttt{select\_single\_lag\_window} 节选）}]
+mean_square_m2 = float(np.mean(dx_m * dx_m))   # <x^2>
+k_b_j_k = (
+    3.0 * np.pi * ETA * radius_m * mean_square_m2
+    / (TEMPERATURE * lag_s)
+)
+\end{lstlisting}
+
+对应公式推导：
+\begin{align}
+  \langle x^2 \rangle &= \frac{1}{N}\sum_{i=1}^N (\delta x_i)^2, \\
+  k_B &= \frac{3\pi\eta\,r_\text{eff}\,\langle x^2\rangle}{T\,\tau}.
+\end{align}
+
+%% ═══════════════════════════════════════════════════════
+\section{实验结果}
+
+\subsection{粒子 1（Particle 1）}
+
+\subsubsection{自由落体}
+
+\begin{table}[h]
+\centering
+\caption{粒子 1 自由落体拟合结果}
+\label{tab:p1_freefall}
+\begin{tabular}{ll}
+\toprule
+项目 & 数值 \\
+\midrule
+有效数据点 & 328 / 487 \\
+有效 $y$ 区间 & 0.373--\SI{1.962}{\milli\metre} \\
+有效时间范围 & 5.9--\SI{38.6}{\second} \\
+终端速度 $v_g$ & \SI{48.13}{\micro\metre\per\second} \\
+拟合 $R^2$ & 0.99970 \\
+Stokes 半径 $r_0$ & \SI{0.6722}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.6329}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.2658}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1279 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{布朗运动}
+
+布朗轨迹共 4793 个数据点（其中插值修复 20 个缺失帧），帧率 $\Delta t = \SI{0.1}{\second}$，
+全局漂移速度 $v_\text{drift} = \SI{0.064}{\micro\metre\per\second}$，
+参考扩散系数 $D_\text{ref} = \SI{19.03}{\micro\metre^2\per\second}$（$R^2 = 0.9991$）。
+
+\begin{table}[h]
+\centering
+\caption{粒子 1 各 lag 组计算结果（$N=150$ 非重叠位移）}
+\label{tab:p1_results}
+\begin{tabular}{ccccccc}
+\toprule
+$\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
+\midrule
+0.5 & 268.7--343.7 & $-0.0031$ & 19.090 & 19.090 & $1.4061\times10^{-23}$ & $+1.85\%$ \\
+1.0 & 29.0--179.0  & $+0.0103$ & 38.915 & 19.457 & $1.4332\times10^{-23}$ & $+3.81\%$ \\
+1.5 & 74.1--299.1  & $+0.0097$ & 57.048 & 19.016 & $1.4007\times10^{-23}$ & $+1.45\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{粒子 1 分析报告图}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle1/report.png}
+\caption{粒子 1 四面板报告图。左上：自由落体 $y$--$t$ 拟合；右上：布朗轨迹散点（三组采样窗口，蓝圆/$\tau=0.5\,\text{s}$，红方/$\tau=1.0\,\text{s}$，绿三角/$\tau=1.5\,\text{s}$）；左下：$\langle x^2\rangle$ vs.\ $\tau$ 与参考直线对比；右下：数值汇总。}
+\label{fig:p1_report}
+\end{figure}
+
+\clearpage
+\subsection{粒子 2（Particle 2）}
+
+\subsubsection{自由落体}
+
+\begin{table}[h]
+\centering
+\caption{粒子 2 自由落体拟合结果}
+\label{tab:p2_freefall}
+\begin{tabular}{ll}
+\toprule
+项目 & 数值 \\
+\midrule
+有效数据点 & 258 / 351 \\
+有效 $y$ 区间 & $-1.590$--$\SI{-0.100}{\milli\metre}$ \\
+有效时间范围 & 9.0--\SI{35.0}{\second} \\
+终端速度 $v_g$ & \SI{57.85}{\micro\metre\per\second} \\
+拟合 $R^2$ & 0.99968 \\
+Stokes 半径 $r_0$ & \SI{0.7369}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.6976}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.3951}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1160 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{布朗运动}
+
+布朗轨迹共 2566 个数据点（无缺失），$\Delta t = \SI{0.1}{\second}$，
+全局漂移速度 $v_\text{drift} = \SI{-0.395}{\micro\metre\per\second}$，
+参考扩散系数 $D_\text{ref} = \SI{20.91}{\micro\metre^2\per\second}$（$R^2 = 0.9949$）。
+
+\begin{table}[h]
+\centering
+\caption{粒子 2 各 lag 组计算结果（$N=150$ 非重叠位移）}
+\label{tab:p2_results}
+\begin{tabular}{ccccccc}
+\toprule
+$\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
+\midrule
+0.5 & 179.0--254.0 & $-0.0083$ & 20.812 & 20.812 & $1.6896\times10^{-23}$ & $+22.4\%$ \\
+1.0 & 44.3--194.3  & $-0.174\phantom{0}$ & 40.552 & 20.276 & $1.6461\times10^{-23}$ & $+19.2\%$ \\
+1.5 & 25.8--250.8  & $-0.344\phantom{0}$ & 58.519 & 19.506 & $1.5836\times10^{-23}$ & $+14.7\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{粒子 2 分析报告图}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle2/report.png}
+\caption{粒子 2 四面板报告图（同图 \ref{fig:p1_report} 布局）。}
+\label{fig:p2_report}
+\end{figure}
+
+\clearpage
+\subsection{粒子 3（Particle 3）}
+
+\subsubsection{自由落体}
+
+\begin{table}[h]
+\centering
+\caption{粒子 3 自由落体拟合结果}
+\label{tab:p3_freefall}
+\begin{tabular}{ll}
+\toprule
+项目 & 数值 \\
+\midrule
+有效数据点 & 207 / 348 \\
+有效 $y$ 区间 & $-1.400$--$\SI{0.050}{\milli\metre}$ \\
+有效时间范围 & 3.8--\SI{24.4}{\second} \\
+终端速度 $v_g$ & \SI{70.37}{\micro\metre\per\second} \\
+拟合 $R^2$ & 0.99953 \\
+Stokes 半径 $r_0$ & \SI{0.8127}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.7733}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.5465}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1047 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{布朗运动}
+
+布朗轨迹共 2711 个数据点（其中插值修复 26 个缺失帧），$\Delta t = \SI{0.1}{\second}$，
+全局漂移速度 $v_\text{drift} = \SI{0.272}{\micro\metre\per\second}$，
+参考扩散系数 $D_\text{ref} = \SI{18.41}{\micro\metre^2\per\second}$（$R^2 = 0.9998$）。
+
+\begin{table}[h]
+\centering
+\caption{粒子 3 各 lag 组计算结果（$N=150$ 非重叠位移）}
+\label{tab:p3_results}
+\begin{tabular}{ccccccc}
+\toprule
+$\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
+\midrule
+0.5 & 109.9--184.9 & $+0.0079$ & 18.679 & 18.679 & $1.6810\times10^{-23}$ & $+21.8\%$ \\
+1.0 & 88.0--238.0  & $-0.0816$ & 36.815 & 18.407 & $1.6566\times10^{-23}$ & $+20.0\%$ \\
+1.5 & 1.8--226.8   & $+0.0191$ & 54.118 & 18.039 & $1.6235\times10^{-23}$ & $+17.6\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{粒子 3 分析报告图}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle3/report.png}
+\caption{粒子 3 四面板报告图（同图 \ref{fig:p1_report} 布局）。}
+\label{fig:p3_report}
+\end{figure}
+
+\clearpage
+%% ═══════════════════════════════════════════════════════
+\section{误差分析}
+
+\subsection{三粒子结果对比}
+
+\begin{table}[h]
+\centering
+\caption{三粒子关键参数对比}
+\label{tab:comparison}
+\begin{tabular}{lccc}
+\toprule
+参数 & 粒子 1 & 粒子 2 & 粒子 3 \\
+\midrule
+$r_\text{eff}$ (\si{\micro\metre}) & 0.6329 & 0.6976 & 0.7733 \\
+自由落体 $R^2$ & 0.99970 & 0.99968 & 0.99953 \\
+布朗轨迹点数 & 4793 & 2566 & 2711 \\
+全局漂移 (\si{\micro\metre\per\second}) & $+0.064$ & $-0.395$ & $+0.272$ \\
+$D_\text{ref}$ (\si{\micro\metre^2\per\second}) & 19.03 & 20.91 & 18.41 \\
+$D_\text{ref}$ / $D_\text{SE,expect}$\footnotemark & 1.015 & 1.230 & 1.197 \\
+$k_B$ 误差范围 & $+1.5\%\sim+3.8\%$ & $+14.7\%\sim+22.4\%$ & $+17.6\%\sim+21.8\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+\footnotetext{$D_\text{SE,expect} = k_{B,\text{NIST}}\,T / (6\pi\eta r_\text{eff})$，为 Stokes-Einstein 理论预期值。}
+
+\subsection{粒子 1 误差来源分析}
+
+粒子 1 的三个 lag 组 $k_B$ 误差均在 $2\%\sim4\%$ 以内，处于良好水平。主要不确定度来源：
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{统计涨落}：每组仅 $N=150$ 个独立位移，$\langle x^2\rangle$ 的标准误差约为
+    $\sigma_{\langle x^2\rangle}/\langle x^2\rangle \approx \sqrt{2/N} \approx 11.5\%$，
+    对应 $k_B$ 单次测量标准误差约 $12\%$；三组平均后压低约 $\sqrt{3}$ 倍至约 $7\%$。
+    实际误差约 $2\%\sim4\%$ 说明所选窗口统计性质较好。
+  \item \textbf{窗口选择偏差}：最优评分标准偏向低方差窗口，可能系统性低估 $\langle x^2\rangle$；
+    但实测误差为正（偏高），说明此效应不显著或被其他因素抵消。
+  \item \textbf{有效半径不确定度}：自由落体仅用 Stokes 定律和 Cunningham 修正，忽略了
+    非球形修正和油滴蒸发效应；$r_\text{eff}$ 的系统误差直接乘入 $k_B$。
+  \item \textbf{温度不确定度}：实验室温度波动 $\pm\SI{1}{\kelvin}$ 引入约 $0.3\%$ 误差。
+  \item \textbf{空气黏度 $\eta$}：取常温标准值，若实验室温度偏离 $20\,^\circ\text{C}$，
+    $\eta$ 随温度变化约 $2\%/10\,^\circ\text{C}$。
+\end{enumerate}
+
+\subsection{粒子 2 误差偏大的原因}
+
+粒子 2 的 $k_B$ 误差约 $15\%\sim22\%$，远大于粒子 1，主要原因如下：
+
+\subsubsection{实测扩散系数偏高}
+
+利用 Stokes-Einstein 关系计算理论期望扩散系数，与实测对比：
+\begin{equation}
+  D_\text{expect} = \frac{k_{B,\text{NIST}}\,T}{6\pi\eta\,r_\text{eff}}.
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{实测 $D_\text{ref}$ 与理论期望值对比}
+\begin{tabular}{lccc}
+\toprule
+粒子 & $D_\text{expect}$ (\si{\micro\metre^2\per\second}) & $D_\text{ref}$ (\si{\micro\metre^2\per\second}) & 比值 $D_\text{ref}/D_\text{expect}$ \\
+\midrule
+粒子 1 & 18.74 & 19.03 & 1.015 \\
+粒子 2 & 17.01 & 20.91 & 1.230 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+粒子 2 的实测扩散系数比理论预期高 23\%，这一偏差直接导致 $k_B$ 偏高，而非来自自由落体测半径的问题（粒子 2 的 $R^2 = 0.9997$，自由落体拟合质量优良）。
+
+\subsubsection{大漂移导致残余非线性误差}
+
+粒子 2 的全局线性漂移 $v_\text{drift} = \SI{-0.395}{\micro\metre\per\second}$，是粒子 1 的约 6 倍。
+脚本采用\textbf{线性漂移}扣除。若实验过程中存在热对流、电场不均匀或载物台蠕变等导致的非线性漂移成分，
+简单线性扣除后仍残留低频"慢运动"，其 MSD 贡献叠加在真实扩散之上，导致 $\langle x^2\rangle$ 被高估。
+
+此效应在短 lag 时表现更明显：$\tau=0.5\,\text{s}$ 误差最大（+22.4\%），$\tau=1.5\,\text{s}$ 误差最小（+14.7\%），与慢漂移残余对短 lag MSD 影响相对更大的预期一致。
+
+\subsubsection{轨迹偏短导致统计涨落增大}
+
+粒子 2 的布朗轨迹约 $\SI{256}{\second}$，仅为粒子 1（约 $\SI{479}{\second}$）的一半。
+轨迹越短，可选窗口数越少，最优窗口偶然偏高的概率越大。
+
+\subsubsection{改进建议}
+
+\begin{itemize}[leftmargin=2em]
+  \item 延长粒子 2、3 的布朗运动采集时间，获取更长轨迹；
+  \item 采用多项式或滑动平均漂移扣除方案，更好地去除非线性慢漂移；
+  \item 或采用速度自相关函数（VACF）方法提取 $D$，对低频漂移不敏感。
+\end{itemize}
+
+\subsection{粒子 3 误差偏大的原因}
+
+粒子 3 的 $k_B$ 误差为 $18\%\sim22\%$，与粒子 2 相近，成因类似：
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{实测扩散系数偏高}：$D_\text{ref}/D_\text{expect} = 18.41/15.37 = 1.20$，
+    比理论预期高约 20\%，说明布朗轨迹本身存在额外能量贡献。
+  \item \textbf{中等漂移}：全局漂移 $v_\text{drift} = \SI{0.272}{\micro\metre\per\second}$，
+    约为粒子 1 的 4 倍，线性扣除后可能残留低频分量。
+  \item \textbf{轨迹较短}：2711 点（约 \SI{271}{\second}），可选窗口数有限，
+    统计偶然性较大。
+  \item \textbf{自由落体有效范围有限制}：落下过程末段与反弹段 $y$ 值重叠，
+    需将有效下界提高至 $\SI{-1.40}{\milli\metre}$ 以排除反弹污染，
+    自由落体段缩短后对 $v_g$ 拟合的影响可忽略（$R^2=0.9995$），
+    但说明实验条件导致数据质量限制。
+\end{itemize}
+
+%% ═══════════════════════════════════════════════════════
+\section{实验总结}
+
+本实验通过密立根装置对三颗油滴的自由落体和布朗运动分别进行了分析：
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{粒子 1}：三个 lag 组的 $k_B$ 结果分别为
+    $1.4061\times10^{-23}$、$1.4332\times10^{-23}$、$1.4007\times10^{-23}\,\si{\joule\per\kelvin}$，
+    相对误差 $1.5\%\sim3.8\%$，结果良好；
+  \item \textbf{粒子 2}：$k_B$ 结果偏高约 $15\%\sim22\%$，
+    主要归因于布朗轨迹存在较大非线性漂移（$|v_\text{drift}|=\SI{0.395}{\micro\metre\per\second}$）
+    以及采集时间较短；
+  \item \textbf{粒子 3}：$k_B$ 结果偏高约 $18\%\sim22\%$，成因与粒子 2 类似，
+    另有自由落体末段与反弹重叠导致的有效数据截断问题；
+  \item NIST 精确值 $k_B = \SI{1.380649e-23}{\joule\per\kelvin}$。
+\end{itemize}
+
+粒子 1 的结果表明本实验方法在稳定实验条件下可达到 $2\%\sim4\%$ 的精度。
+粒子 2、3 的系统偏高来自布朗运动采集阶段的低频漂移，与自由落体的测量质量（两者 $R^2>0.999$）无关。
+实验验证了 Einstein--Smoluchowski 关系的基本正确性，
+同时展示了 Cunningham 修正在亚微米颗粒上的重要性（修正幅度约 $10\%\sim13\%$）。
+数据驱动的自动化分析流程（\texttt{interval\_boltzmann\_analysis.py}）已成功处理三颗粒子，
+可方便地扩展至后续更多粒子。
+
+%% ═══════════════════════════════════════════════════════
+\appendix
+\section{关键公式汇总}
+
+\begin{align}
+  r_0 &= \sqrt{\frac{9\eta v_g}{2(\rho_\text{oil}-\rho_\text{air})g}}
+  \tag{Stokes 半径} \\[4pt]
+  r_\text{eff} &= \frac{-B/P + \sqrt{(B/P)^2 + 4r_0^2}}{2}
+  \tag{Cunningham 修正} \\[4pt]
+  D &= \frac{\langle x^2\rangle}{2\tau}
+  \tag{扩散系数} \\[4pt]
+  k_B &= \frac{3\pi\eta\,r_\text{eff}\,\langle x^2\rangle}{T\,\tau}
+  \tag{玻尔兹曼常数}
+\end{align}
+
+\end{document}

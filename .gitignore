@@ -1,0 +1,56 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# LaTeX auxiliary files
+*.aux
+*.fdb_latexmk
+*.fls
+*.toc
+*.log
+*.out
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ind
+*.ilg
+*.lof
+*.lot
+*.lol
+
+# Video files
+*.mov
+*.mp4
+*.avi
+
+# Generated output (PDFs and images derived from scripts)
+*.pdf
+*.png
+
+# Editor
+.vscode/
+*.swp
+*.swo

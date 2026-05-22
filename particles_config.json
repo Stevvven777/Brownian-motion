@@ -1,0 +1,35 @@
+{
+  "output_root": "results/interval_boltzmann",
+  "particles": [
+    {
+      "particle_id": "particle1",
+      "drop_file": "P1_drop.txt",
+      "brown_file": "P1_brown.txt",
+      "drop_valid_y_min_mm": 0.373,
+      "drop_valid_y_max_mm": 1.962,
+      "lags_s": [0.5, 1.0, 1.5],
+      "n_displacements": 150,
+      "reference_max_lag_s": 20.0
+    },
+    {
+      "particle_id": "particle2",
+      "drop_file": "P2_drop.txt",
+      "brown_file": "P2_brown.txt",
+      "drop_valid_y_min_mm": -1.59,
+      "drop_valid_y_max_mm": -0.1,
+      "lags_s": [0.5, 1.0, 1.5],
+      "n_displacements": 150,
+      "reference_max_lag_s": 20.0
+    },
+    {
+      "particle_id": "particle3",
+      "drop_file": "P3_drop.txt",
+      "brown_file": "P3_brown.txt",
+      "drop_valid_y_min_mm": -1.40,
+      "drop_valid_y_max_mm": 0.05,
+      "lags_s": [0.5, 1.0, 1.5],
+      "n_displacements": 150,
+      "reference_max_lag_s": 20.0
+    }
+  ]
+}

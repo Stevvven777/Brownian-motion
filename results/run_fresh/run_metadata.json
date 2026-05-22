@@ -1,0 +1,56 @@
+{
+  "scale_um_per_px": 2.381,
+  "physics_params": {
+    "temperature_k": 293.15,
+    "pressure_pa": 101325.0,
+    "oil_density_kgm3": 886.0,
+    "air_density_kgm3": 1.204,
+    "eta0_pa_s": 1.81e-05,
+    "eta0_reference_k": 293.15,
+    "sutherland_c_k": 110.4,
+    "viscosity_model": "sutherland",
+    "cunningham_b_pa_m": 0.0082
+  },
+  "tracking_config": {
+    "tracker": "template",
+    "roi_size_px": 60,
+    "search_range_px": 24,
+    "trackpy_diameter_px": 11,
+    "trackpy_minmass": null,
+    "trackpy_memory_frames": 3,
+    "selection_radius_px": 40.0,
+    "particle_polarity": "bright",
+    "clahe": true,
+    "blur_kernel_px": 3,
+    "max_frames": null,
+    "bg_frames": 60
+  },
+  "freefall_video": {
+    "path": "perticle_1_drop.mov",
+    "fps": 10.0,
+    "native_fps": 10.0,
+    "frame_count": 688,
+    "width_px": 1280,
+    "height_px": 960
+  },
+  "brownian_video": {
+    "path": "particle_1_brown.mov",
+    "fps": 10.0,
+    "native_fps": 10.0,
+    "frame_count": 4795,
+    "width_px": 1280,
+    "height_px": 960
+  },
+  "brownian_points_px": [
+    [
+      623.2028425241615,
+      529.5623649801023
+    ]
+  ],
+  "freefall_points_px": [
+    [
+      664.6800243790949,
+      56.829803443547156
+    ]
+  ]
+}

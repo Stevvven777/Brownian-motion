@@ -1,0 +1,41 @@
+{
+  "particle_id": "particle3",
+  "inputs": {
+    "drop_file": "P3_drop.txt",
+    "brown_file": "P3_brown.txt",
+    "drop_valid_y_min_mm": -1.4,
+    "drop_valid_y_max_mm": 0.05,
+    "lags_s": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "n_displacements": 150,
+    "reference_max_lag_s": 20.0
+  },
+  "freefall": {
+    "valid_points": 207,
+    "all_points": 348,
+    "terminal_velocity_m_s": 7.036663806539597e-05,
+    "radius_stokes_m": 8.127313871929667e-07,
+    "radius_cunningham_m": 7.732742066246163e-07,
+    "cunningham_factor": 1.1046558997796745,
+    "r_squared": 0.9995258243035896
+  },
+  "brownian": {
+    "n_points": 2711,
+    "n_missing_raw": 26,
+    "n_missing_interpolated": 26,
+    "dt_s": 0.09999999999999432,
+    "global_drift_m_s": 2.71975177807731e-07,
+    "reference_d_linear_m2_s": 1.8410699177569376e-11,
+    "reference_r_squared": 0.9997819530649598
+  },
+  "constants": {
+    "eta_pa_s": 1.81e-05,
+    "rho_oil_kg_m3": 886.0,
+    "rho_air_kg_m3": 1.204,
+    "temperature_k": 293.15,
+    "k_b_true_j_k": 1.380649e-23
+  }
+}
