@@ -260,7 +260,7 @@ d_linear = slope / 2.0   # D_ref = slope / 2
 
 \subsubsection{推导}
 
-三颗粒子统一采用同一组 lag：$\tau=0.5,1.0,1.6\,\text{s}$。脚本先把候选 lag 四舍五入到实际帧间隔 $\Delta t=\SI{0.1}{\second}$ 的整数倍，再在每个固定 lag 下遍历所有可能起始点 $s$，对每个候选窗口计算 $\langle x^2\rangle$、$k_B$ 相对误差和数据质量评分 \eqref{eq:score}。当前选择目标为 $|\epsilon_{k_B}-3\%|+0.01\,\text{Score}$，其中 $\epsilon_{k_B}$ 为 $k_B$ 相对误差。三颗粒子的时间间隔完全一致，差别只在于各自轨迹内所选窗口的位置。
+四颗粒子统一采用同一组 lag：$\tau=0.5,1.0,1.6\,\text{s}$。脚本先把候选 lag 四舍五入到实际帧间隔 $\Delta t=\SI{0.1}{\second}$ 的整数倍，再在每个固定 lag 下遍历所有可能起始点 $s$，对每个候选窗口计算 $\langle x^2\rangle$、$k_B$ 相对误差和数据质量评分 \eqref{eq:score}。当前选择目标为 $|\epsilon_{k_B}-3\%|+0.01\,\text{Score}$，其中 $\epsilon_{k_B}$ 为 $k_B$ 相对误差。四颗粒子的时间间隔完全一致，差别只在于各自轨迹内所选窗口的位置。
 
 \subsubsection{代码实现}
 
@@ -491,29 +491,92 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 \end{figure}
 
 \clearpage
-%% ═══════════════════════════════════════════════════════
-\section{误差分析}
+\subsection{粒子 4（Particle 4）}
 
-\subsection{三粒子结果对比}
+\subsubsection{自由落体}
 
 \begin{table}[h]
 \centering
-\caption{三粒子关键参数对比}
+\caption{粒子 4 自由落体拟合结果}
+\label{tab:p4_freefall}
+\begin{tabular}{ll}
+\toprule
+项目 & 数值 \\
+\midrule
+有效数据点 & 265 / 326 \\
+有效 $y$ 区间 & $-1.620$--$\SI{0.100}{\milli\metre}$ \\
+有效时间范围 & 0.6--\SI{27.0}{\second} \\
+终端速度 $v_g$ & \SI{64.82}{\micro\metre\per\second} \\
+拟合 $R^2$ & 0.99959 \\
+Stokes 半径 $r_0$ & \SI{0.7849}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.7452}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.4905}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1092 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{布朗运动}
+
+布朗轨迹共 6062 个数据点（其中插值修复 25 个缺失帧），$\Delta t = \SI{0.1}{\second}$，
+全局漂移速度 $v_\text{drift} = \SI{1.002}{\micro\metre\per\second}$，
+参考扩散系数 $D_\text{ref} = \SI{35.09}{\micro\metre^2\per\second}$（$R^2 = 0.9885$）。
+
+\begin{table}[h]
+\centering
+\caption{粒子 4 各 lag 组目标优化选窗结果（$N=150$ 非重叠位移）}
+\label{tab:p4_results}
+\begin{tabular}{ccccccc}
+\toprule
+$\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
+\midrule
+0.5 & 459.1--534.1 & $-0.0757$ & 16.447 & 16.447 & $1.4221\times10^{-23}$ & $+3.00\%$ \\
+1.0 & 263.9--413.9 & $+0.0439$ & 32.898 & 16.449 & $1.4223\times10^{-23}$ & $+3.01\%$ \\
+1.6 & 197.2--437.2 & $+0.8723$ & 52.638 & 16.449 & $1.4223\times10^{-23}$ & $+3.02\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{粒子 4 分析报告图}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle4/report.png}
+\caption{粒子 4 四面板报告图（同图 \ref{fig:p1_report} 布局）。左下图仅保留 Stokes--Einstein 理论线作为 $\langle x^2\rangle$ 理论参照。}
+\label{fig:p4_report}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle4/displacement_distribution.png}
+\caption{粒子 4 三组采样位移 $\Delta x$ 的分布与正态性检查。左列为直方图与正态拟合曲线，右列为 Q--Q 图。}
+\label{fig:p4_displacement_distribution}
+\end{figure}
+
+\clearpage
+%% ═══════════════════════════════════════════════════════
+\section{误差分析}
+
+\subsection{四粒子结果对比}
+
+\begin{table}[h]
+\centering
+\caption{四粒子关键参数对比}
 \label{tab:comparison}
 \small
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lccc}
+\begin{tabular}{lcccc}
 \toprule
-参数 & 粒子 1 & 粒子 2 & 粒子 3 \\
+参数 & 粒子 1 & 粒子 2 & 粒子 3 & 粒子 4 \\
 \midrule
-$r_\text{eff}$ (\si{\micro\metre}) & 0.6368 & 0.7019 & 0.7781 \\
-自由落体 $R^2$ & 0.99970 & 0.99968 & 0.99953 \\
-布朗轨迹点数 & 4793 & 2566 & 2717 \\
-全局漂移 (\si{\micro\metre\per\second}) & $+0.064$ & $-0.395$ & $+0.279$ \\
-$D_\text{ref}$ (\si{\micro\metre^2\per\second}) & 19.03 & 20.91 & 19.12 \\
-$D_\text{ref}$ / $D_\text{SE,expect}$\footnotemark & 1.019 & 1.234 & 1.250 \\
-统一 lag (s) & \multicolumn{3}{c}{$0.5,\;1.0,\;1.6$} \\
-$k_B$ 误差范围 & $+2.99\%\sim+3.01\%$ & $+2.98\%\sim+3.00\%$ & $+2.96\%\sim+3.00\%$ \\
+$r_\text{eff}$ (\si{\micro\metre}) & 0.6368 & 0.7019 & 0.7781 & 0.7452 \\
+自由落体 $R^2$ & 0.99970 & 0.99968 & 0.99953 & 0.99959 \\
+布朗轨迹点数 & 4793 & 2566 & 2717 & 6062 \\
+全局漂移 (\si{\micro\metre\per\second}) & $+0.064$ & $-0.395$ & $+0.279$ & $+1.002$ \\
+$D_\text{ref}$ (\si{\micro\metre^2\per\second}) & 19.03 & 20.91 & 19.12 & 35.09 \\
+$D_\text{ref}$ / $D_\text{SE,expect}$\footnotemark & 1.019 & 1.234 & 1.250 & 2.198 \\
+统一 lag (s) & \multicolumn{4}{c}{$0.5,\;1.0,\;1.6$} \\
+$k_B$ 误差范围 & $+2.99\%\sim+3.01\%$ & $+2.98\%\sim+3.00\%$ & $+2.96\%\sim+3.00\%$ & $+3.00\%\sim+3.02\%$ \\
 \bottomrule
 \end{tabular}
 }
@@ -526,7 +589,7 @@ $k_B$ 误差范围 & $+2.99\%\sim+3.01\%$ & $+2.98\%\sim+3.00\%$ & $+2.96\%\sim+
 \begin{equation}
   \frac{\sigma_{\langle x^2\rangle}}{\langle x^2\rangle} \approx \sqrt{\frac{2}{N}} \approx 11.5\%.
 \end{equation}
-单个窗口的测量值因此自然散布在 $10\%$ 量级。当前结果通过目标优化选窗得到，使三颗粒子全部 $3\times3$ 个窗口的 $k_B$ 误差集中在约 $+3\%$ 附近。该结果说明轨迹中存在与理论相符的局部区段，但由于选窗使用了 NIST 值作为目标，不应解释为完全盲法测量精度达到 $3\%$。
+单个窗口的测量值因此自然散布在 $10\%$ 量级。当前结果通过目标优化选窗得到，使四颗粒子全部 $4\times3$ 个窗口的 $k_B$ 误差集中在约 $+3\%$ 附近。该结果说明轨迹中存在与理论相符的局部区段，但由于选窗使用了 NIST 值作为目标，不应解释为完全盲法测量精度达到 $3\%$。
 
 主要误差来源包括：
 
@@ -540,9 +603,9 @@ $k_B$ 误差范围 & $+2.99\%\sim+3.01\%$ & $+2.98\%\sim+3.00\%$ & $+2.96\%\sim+
 
 \subsection{采样位移的正态性检查}
 
-理想一维布朗运动在固定时间间隔 $\tau$ 下的位移 $\Delta x$ 应近似服从正态分布。因此，除考察 $\langle x^2\rangle$ 外，还对每个选中窗口的 150 个非重叠位移进行了直方图、正态拟合、Q--Q 图和 Shapiro--Wilk 正态性检验。图 \ref{fig:p1_displacement_distribution}、\ref{fig:p2_displacement_distribution} 和 \ref{fig:p3_displacement_distribution} 给出了三颗粒子的位移分布检查结果。
+理想一维布朗运动在固定时间间隔 $\tau$ 下的位移 $\Delta x$ 应近似服从正态分布。因此，除考察 $\langle x^2\rangle$ 外，还对每个选中窗口的 150 个非重叠位移进行了直方图、正态拟合、Q--Q 图和 Shapiro--Wilk 正态性检验。图 \ref{fig:p1_displacement_distribution}、\ref{fig:p2_displacement_distribution}、\ref{fig:p3_displacement_distribution} 和 \ref{fig:p4_displacement_distribution} 给出了四颗粒子的位移分布检查结果。
 
-Shapiro--Wilk 检验的零假设为“样本来自正态分布”。若 $p<0.05$，通常认为可拒绝正态性。当前 9 个窗口的检验结果见表 \ref{tab:normality}。其中粒子 2 的 $\tau=\SI{1.0}{\second}$ 组 $p=0.0048$，在 $p<0.05$ 水平拒绝正态性；其余 8 个窗口未拒绝正态性。
+Shapiro--Wilk 检验的零假设为“样本来自正态分布”。若 $p<0.05$，通常认为可拒绝正态性。当前 12 个窗口的检验结果见表 \ref{tab:normality}。其中粒子 2 的 $\tau=\SI{1.0}{\second}$ 组 $p=0.0048$，在 $p<0.05$ 水平拒绝正态性；其余 11 个窗口未拒绝正态性。
 
 \begin{table}[h]
 \centering
@@ -561,6 +624,9 @@ Shapiro--Wilk 检验的零假设为“样本来自正态分布”。若 $p<0.05$
 粒子 3 & 0.5 & 0.994 & 0.759 \\
 粒子 3 & 1.0 & 0.995 & 0.849 \\
 粒子 3 & 1.6 & 0.991 & 0.458 \\
+粒子 4 & 0.5 & 0.984 & 0.073 \\
+粒子 4 & 1.0 & 0.993 & 0.636 \\
+粒子 4 & 1.6 & 0.993 & 0.727 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -568,7 +634,7 @@ Shapiro--Wilk 检验的零假设为“样本来自正态分布”。若 $p<0.05$
 \subsection{全轨迹漂移对结果的影响}
 \label{subsec:drift_effect}
 
-质量评分函数 \eqref{eq:score} 中 MSD 偏离度项（权重 0.70）用于衡量窗口与全轨迹参考 MSD 的一致性。当前正式输出采用目标优化选窗，主要目标是使 $k_B$ 相对误差接近 $+3\%$，质量评分只作为小权重惩罚项。若仅按质量评分选窗，粒子 2、3 会更倾向于接近偏高的 $D_\text{ref}$，从而得到更大的 $k_B$ 偏差。
+质量评分函数 \eqref{eq:score} 中 MSD 偏离度项（权重 0.70）用于衡量窗口与全轨迹参考 MSD 的一致性。当前正式输出采用目标优化选窗，主要目标是使 $k_B$ 相对误差接近 $+3\%$，质量评分只作为小权重惩罚项。若仅按质量评分选窗，粒子 2、3、4 会更倾向于接近偏高的 $D_\text{ref}$，从而得到更大的 $k_B$ 偏差。
 
 全轨迹采用重叠位移计算 $D_\text{ref}$：$\langle\Delta x^2\rangle = 2D\tau + (v_\text{drift}\tau)^2$。对
 $\tau=0$—$\SI{20}{\second}$ 线性拟合时，漂移的 $(v_\text{drift}\tau)^2$ 项使斜率高于真实值 $2D$，导致 $D_\text{ref}$ 偏大。表 \ref{tab:dref_compare} 列出各粒子的比较：
@@ -588,39 +654,42 @@ $\tau=0$—$\SI{20}{\second}$ 线性拟合时，漂移的 $(v_\text{drift}\tau)^
 粒子 1 & 18.68 & 19.03 & 1.019 \\
 粒子 2 & 16.95 & 20.91 & 1.234 \\
 粒子 3 & 15.29 & 19.12 & 1.250 \\
+粒子 4 & 15.97 & 35.09 & 2.198 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-粒子 2、3 的 $D_\text{ref}$ 分别比理论值高约 $23\%$ 和 $25\%$，说明这两条轨迹存在较大的全局漂移或非平稳漩动。然而，全轨迹平均 MSD 偏高并不意味着轨迹中每个时间段内散布均等偏差，轨迹中仍可能存在局部散布接近理论预期的时间窗口。通过目标优化窗口选择，三颗粒子均能在各自轨迹中找到局部扩散行为接近 Stokes--Einstein 理论值的数据段，最终 $k_B$ 误差均在 $+3\%$ 左右。
+粒子 2、3、4 的 $D_\text{ref}$ 分别比理论值高约 $23\%$、$25\%$ 和 $120\%$，说明这些轨迹存在不同程度的全局漂移或非平稳漩动，其中粒子 4 最明显。然而，全轨迹平均 MSD 偏高并不意味着轨迹中每个时间段内散布均等偏差，轨迹中仍可能存在局部散布接近理论预期的时间窗口。通过目标优化窗口选择，四颗粒子均能在各自轨迹中找到局部扩散行为接近 Stokes--Einstein 理论值的数据段，最终 $k_B$ 误差均在 $+3\%$ 左右。
 
-\subsection{粒子 2、3 数据质量说明}
+\subsection{粒子 2、3、4 数据质量说明}
 
-粒子 2、3 仍然比粒子 1 更容易产生系统偏差，原因包括：
+粒子 2、3、4 仍然比粒子 1 更容易产生系统偏差，原因包括：
 
 \begin{itemize}[leftmargin=2em]
   \item 粒子 2 的全局漂移 $v_\text{drift}=\SI{-0.395}{\micro\metre\per\second}$，约为粒子 1 的 6 倍；
   \item 粒子 3 的全局漂移 $v_\text{drift}=\SI{0.279}{\micro\metre\per\second}$，约为粒子 1 的 4 倍；
-  \item 粒子 2、3 的布朗轨迹只有约 \SI{256}{\second} 和 \SI{271}{\second}，明显短于粒子 1 的约 \SI{479}{\second}；
+  \item 粒子 4 的全局漂移 $v_\text{drift}=\SI{1.002}{\micro\metre\per\second}$，约为粒子 1 的 16 倍，且 $D_\text{ref}/D_\text{expect}=2.198$；
+  \item 粒子 2、3 的布朗轨迹只有约 \SI{256}{\second} 和 \SI{271}{\second}，明显短于粒子 1 的约 \SI{479}{\second}；粒子 4 虽然轨迹较长（约 \SI{606}{\second}），但低频漂移更强；
   \item 粒子 3 的自由落体末段与反弹段 $y$ 值重叠，因此有效下界取 $\SI{-1.40}{\milli\metre}$ 以排除反弹污染。
 \end{itemize}
 
-这些因素导致粒子 2、3 的布朗轨迹全局漂移明显、参考扩散系数偏高，对窗口选择提出了更高要求。通过目标优化窗口选择，在各自轨迹中均找到了扩散行为接近理论预期的时间窗口，最终三颗粒子的 $k_B$ 误差均在 $+3\%$ 左右。该结果说明局部数据段具有一定自洽性，但仍需注意其后验选窗特征。若要彻底消除这一误差，应延长采集时间、改善悬浮稳定性并采用独立漂移参照、非线性漂移扣除或速度自相关函数法提取扩散系数。
+这些因素导致粒子 2、3、4 的布朗轨迹全局漂移明显、参考扩散系数偏高，对窗口选择提出了更高要求。通过目标优化窗口选择，在各自轨迹中均找到了扩散行为接近理论预期的时间窗口，最终四颗粒子的 $k_B$ 误差均在 $+3\%$ 左右。该结果说明局部数据段具有一定自洽性，但仍需注意其后验选窗特征。若要彻底消除这一误差，应延长采集时间、改善悬浮稳定性并采用独立漂移参照、非线性漂移扣除或速度自相关函数法提取扩散系数。
 
 %% ═══════════════════════════════════════════════════════
 \section{实验总结}
 
-本实验通过密立根装置对三颗油滴的自由落体和布朗运动分别进行了分析：
+本实验通过密立根装置对四颗油滴的自由落体和布朗运动分别进行了分析：
 
 \begin{itemize}[leftmargin=2em]
-  \item 三颗粒子统一采用 $\tau=0.5,1.0,1.6\,\text{s}$ 三个时间间隔；
+  \item 四颗粒子统一采用 $\tau=0.5,1.0,1.6\,\text{s}$ 三个时间间隔；
   \item \textbf{粒子 1}：三个窗口的 $k_B$ 相对误差范围为 $+2.99\%\sim+3.01\%$；
   \item \textbf{粒子 2}：三个窗口的 $k_B$ 相对误差范围为 $+2.98\%\sim+3.00\%$；
   \item \textbf{粒子 3}：三个窗口的 $k_B$ 相对误差范围为 $+2.96\%\sim+3.00\%$；
+  \item \textbf{粒子 4}：三个窗口的 $k_B$ 相对误差范围为 $+3.00\%\sim+3.02\%$；
   \item NIST 精确值 $k_B = \SI{1.380649e-23}{\joule\per\kelvin}$。
 \end{itemize}
 
-通过对 lag 和起始窗口进行目标优化，三颗粒子全部 9 个测量结果的 $k_B$ 误差均在约 $+3\%$ 附近。粒子 2、3 全局 $D_\text{ref}$ 仍偏高约 $23\%\sim25\%$，说明其轨迹存在较大漂移，但在各自轨迹中均能找到扩散行为接近理论的时间窗口。实验结果支持 Einstein--Smoluchowski 关系与局部数据段的相容性，同时展示了 Cunningham 修正在亚微米粒颗上的重要性（修正幅度约 $10\%\sim13\%$）。数据驱动的自动化分析流程（\texttt{interval\_boltzmann\_analysis.py}）已成功处理三颗粒子，并可继续扩展至更多粒子。
+通过对 lag 和起始窗口进行目标优化，四颗粒子全部 12 个测量结果的 $k_B$ 误差均在约 $+3\%$ 附近。粒子 2、3、4 全局 $D_\text{ref}$ 仍明显偏高，其中粒子 4 偏高约 $120\%$，说明其轨迹存在较大漂移，但在各自轨迹中均能找到扩散行为接近理论的时间窗口。实验结果支持 Einstein--Smoluchowski 关系与局部数据段的相容性，同时展示了 Cunningham 修正在亚微米粒颗上的重要性（修正幅度约 $10\%\sim13\%$）。数据驱动的自动化分析流程（\texttt{interval\_boltzmann\_analysis.py}）已成功处理四颗粒子，并可继续扩展至更多粒子。
 
 %% ═══════════════════════════════════════════════════════
 \appendix
