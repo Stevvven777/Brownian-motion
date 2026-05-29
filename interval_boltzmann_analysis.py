@@ -17,7 +17,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy.stats import kurtosis, linregress, skew
+from scipy.stats import kurtosis, linregress, norm, probplot, shapiro, skew
 
 import matplotlib
 
@@ -25,13 +25,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-ETA = 1.81e-5          # Pa s
+ETA = 1.8290424419e-5 # Pa s, air at 24 C from Sutherland scaling
 RHO_OIL = 886.0        # kg/m^3
-RHO_AIR = 1.204        # kg/m^3
-G = 9.80665            # m/s^2
-PRESSURE = 101325.0    # Pa
+RHO_AIR = 1.1816383310 # kg/m^3, ideal-gas scaling to 24 C and 1008 hPa
+G = 9.7887             # m/s^2, Shenzhen local gravity
+PRESSURE = 100800.0    # Pa, 1008 hPa
 B_CUNNINGHAM = 8.2e-3  # Pa m
-TEMPERATURE = 293.15   # K
+TEMPERATURE = 297.15   # K, 24 C
 K_B_TRUE = 1.380649e-23
 
 DEFAULT_CONFIG_FILE = Path("particles_config.json")
@@ -536,6 +536,32 @@ def build_selected_displacements_df(config: ParticleConfig, brownian: dict[str, 
     return pd.DataFrame(rows)
 
 
+def build_normality_df(config: ParticleConfig, brownian: dict[str, Any]) -> pd.DataFrame:
+    rows = []
+    for result in brownian["lag_results"]:
+        dx_um = result["dx_m"] * 1e6
+        shapiro_stat, shapiro_p = shapiro(dx_um)
+        mean_um = float(np.mean(dx_um))
+        std_um = float(np.std(dx_um, ddof=1))
+        rows.append({
+            "particle_id": config.particle_id,
+            "lag_s": result["lag_s"],
+            "start_index": result["start_index"],
+            "end_index": result["end_index"],
+            "t_start_s": result["t_start_s"],
+            "t_pair_end_s": result["t_pair_end_s"],
+            "n_displacements": result["n_displacements"],
+            "dx_mean_um": mean_um,
+            "dx_std_um": std_um,
+            "dx_skewness": float(skew(dx_um)),
+            "dx_excess_kurtosis": float(kurtosis(dx_um, fisher=True)),
+            "shapiro_w": float(shapiro_stat),
+            "shapiro_p": float(shapiro_p),
+            "normality_rejected_p_lt_0_05": bool(shapiro_p < 0.05),
+        })
+    return pd.DataFrame(rows)
+
+
 def write_metadata_json(config: ParticleConfig, freefall: dict[str, Any], brownian: dict[str, Any]) -> None:
     reference = brownian["reference"]
     metadata = {
@@ -604,10 +630,12 @@ def write_particle_outputs(config: ParticleConfig, freefall: dict[str, Any], bro
     summary_df = build_summary_df(config, brownian)
     window_selection_df = build_window_selection_df(config, brownian)
     selected_displacements_df = build_selected_displacements_df(config, brownian)
+    normality_df = build_normality_df(config, brownian)
 
     summary_df.to_csv(config.output_dir / "calculation_results.csv", index=False)
     window_selection_df.to_csv(config.output_dir / "window_selection.csv", index=False)
     selected_displacements_df.to_csv(config.output_dir / "selected_displacements.csv", index=False)
+    normality_df.to_csv(config.output_dir / "displacement_normality.csv", index=False)
     write_metadata_json(config, freefall, brownian)
     return {
         "freefall_data": freefall_data_df,
@@ -615,7 +643,57 @@ def write_particle_outputs(config: ParticleConfig, freefall: dict[str, Any], bro
         "calculation_results": summary_df,
         "window_selection": window_selection_df,
         "selected_displacements": selected_displacements_df,
+        "displacement_normality": normality_df,
     }
+
+
+def make_displacement_distribution_figure(config: ParticleConfig, brownian: dict[str, Any]) -> None:
+    lag_results = brownian["lag_results"]
+    fig, axes = plt.subplots(len(lag_results), 2, figsize=(11, 3.4 * len(lag_results)))
+    if len(lag_results) == 1:
+        axes = np.array([axes])
+
+    fig.suptitle(
+        f"{config.particle_id}: selected displacement normality checks",
+        fontsize=13,
+        fontweight="bold",
+    )
+
+    for row_index, result in enumerate(lag_results):
+        dx_um = result["dx_m"] * 1e6
+        mean_um = float(np.mean(dx_um))
+        std_um = float(np.std(dx_um, ddof=1))
+        shapiro_stat, shapiro_p = shapiro(dx_um)
+
+        ax = axes[row_index, 0]
+        ax.hist(dx_um, bins="auto", density=True, alpha=0.72, color="#4c78a8", edgecolor="white")
+        x_min, x_max = ax.get_xlim()
+        x_line = np.linspace(x_min, x_max, 300)
+        ax.plot(x_line, norm.pdf(x_line, mean_um, std_um), color="#d62728", lw=2, label="normal fit")
+        ax.axvline(mean_um, color="#222222", ls="--", lw=1, label=f"mean={mean_um:.3f} um")
+        ax.set_title(
+            f"tau={result['lag_s']:.1f}s, t={result['t_start_s']:.1f}-{result['t_pair_end_s']:.1f}s\n"
+            f"W={shapiro_stat:.3f}, p={shapiro_p:.3g}"
+        )
+        ax.set_xlabel("dx (um)")
+        ax.set_ylabel("density")
+        ax.legend(fontsize=8)
+        ax.grid(alpha=0.25)
+
+        ax = axes[row_index, 1]
+        (theoretical_quantiles, ordered_values), (slope, intercept, r_value) = probplot(dx_um, dist="norm")
+        ax.scatter(theoretical_quantiles, ordered_values, s=18, color="#4c78a8", alpha=0.78)
+        x_fit = np.array([float(np.min(theoretical_quantiles)), float(np.max(theoretical_quantiles))])
+        ax.plot(x_fit, slope * x_fit + intercept, color="#d62728", lw=2)
+        ax.set_title(f"Q-Q plot, R={r_value:.4f}")
+        ax.set_xlabel("theoretical normal quantile")
+        ax.set_ylabel("ordered dx (um)")
+        ax.grid(alpha=0.25)
+
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(config.output_dir / "displacement_distribution.png", dpi=160, bbox_inches="tight")
+    fig.savefig(config.output_dir / "displacement_distribution.pdf", dpi=200, bbox_inches="tight")
+    plt.close(fig)
 
 
 def make_report_figure(config: ParticleConfig, freefall: dict[str, Any], brownian: dict[str, Any]) -> None:
@@ -668,10 +746,10 @@ def make_report_figure(config: ParticleConfig, freefall: dict[str, Any], brownia
     for result, color in zip(brownian["lag_results"], colors):
         ax.annotate(f"{result['k_b_error_pct']:+.1f}%", (result["lag_s"], result["x2_mean_m2"] * 1e12),
                     textcoords="offset points", xytext=(6, 7), fontsize=8, color=color)
-    reference_d = brownian["reference"]["d_linear_m2_s"]
+    theory_d = K_B_TRUE * TEMPERATURE / (6.0 * np.pi * ETA * freefall["radius_cunningham_m"])
     lag_line = np.linspace(0, max(lag_values) * 1.08, 100)
-    ax.plot(lag_line, 2 * reference_d * lag_line * 1e12, color="#444444", ls="--",
-            label=f"data reference D={reference_d*1e12:.2f} um^2/s")
+    ax.plot(lag_line, 2 * theory_d * lag_line * 1e12, color="#d62728", ls=":", lw=2,
+            label=f"SE theory D={theory_d*1e12:.2f} um^2/s")
     ax.set_xlabel("lag tau (s)")
     ax.set_ylabel("<x^2> (um^2)")
     ax.set_title("Separate <x^2> results")
@@ -686,7 +764,7 @@ def make_report_figure(config: ParticleConfig, freefall: dict[str, Any], brownia
         f"Freefall valid points: {freefall['valid_points']}",
         f"vg = {freefall['terminal_velocity_m_s']*1e6:.4f} um/s, R^2 = {freefall['r_squared']:.6f}",
         f"r_eff = {freefall['radius_cunningham_m']*1e6:.4f} um, d_eff = {2*freefall['radius_cunningham_m']*1e6:.4f} um",
-        f"reference D (tau<={config.reference_max_lag_s:g}s) = {reference_d*1e12:.4f} um^2/s",
+        f"SE theory D = {theory_d*1e12:.4f} um^2/s",
         "",
         "tau    covered time       <x>      <x^2>      k_B err",
     ]
@@ -768,6 +846,7 @@ def analyze_particle(config: ParticleConfig) -> dict[str, pd.DataFrame]:
     brownian_result = select_brownian_windows(config, freefall_result)
     output_tables = write_particle_outputs(config, freefall_result, brownian_result)
     make_report_figure(config, freefall_result, brownian_result)
+    make_displacement_distribution_figure(config, brownian_result)
     print_report(config, freefall_result, brownian_result)
     return output_tables
 
@@ -798,6 +877,7 @@ def main() -> None:
         "calculation_results": "all_particles_summary.csv",
         "window_selection": "all_particles_window_selection.csv",
         "selected_displacements": "all_particles_selected_displacements.csv",
+        "displacement_normality": "all_particles_displacement_normality.csv",
     }
     written_paths = []
     for table_name, file_name in aggregate_files.items():

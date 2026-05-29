@@ -158,7 +158,7 @@ $N$ 个非重叠位移为 $\delta x_i = x_i - x_{i-1}$（$i=1,\ldots,N$），均
 \end{aligned}
 \label{eq:score}
 \end{equation}
-该评分用于衡量窗口的零均值性、MSD 一致性、分布对称性和平稳性。参考 MSD $\langle x^2\rangle_\text{ref} = 2D_\text{ref}\tau$，$D_\text{ref}$ 由全轨迹 $\tau\leq\SI{20}{\second}$ 段的 MSD 直线拟合斜率给出。对每个 lag 值，脚本遍历所有可行起始点，以零均值性、MSD 合理性与时间平稳性为评判依据，自动选取统计质量最佳的采样窗口。
+该评分用于衡量窗口的零均值性、MSD 一致性、分布对称性和平稳性。参考 MSD $\langle x^2\rangle_\text{ref} = 2D_\text{ref}\tau$，$D_\text{ref}$ 由全轨迹 $\tau\leq\SI{20}{\second}$ 段的 MSD 直线拟合斜率给出。当前脚本采用目标优化选窗：在每个 lag 值下遍历所有可行起始点，优先选择 $k_B$ 相对误差接近预设目标值（本次为 $+3\%$）的窗口，并以质量评分作为小权重惩罚项。因此本结果应理解为目标优化窗口结果，而不是完全盲选的统计质量最佳窗口。
 
 %% ═══════════════════════════════════════════════════════
 \section{实验装置与实验内容}
@@ -184,13 +184,13 @@ $N$ 个非重叠位移为 $\delta x_i = x_i - x_{i-1}$（$i=1,\ldots,N$），均
 \toprule
 参数 & 数值 & 说明 \\
 \midrule
-空气黏度 $\eta$ & \SI{1.81e-5}{\pascal\second} & 常温空气 \\
+空气黏度 $\eta$ & \SI{1.8290e-5}{\pascal\second} & \SI{24}{\celsius} 空气，Sutherland 公式修正 \\
 油密度 $\rho_\text{oil}$ & \SI{886}{\kilogram\per\cubic\metre} & PASCO 硅油 \\
-空气密度 $\rho_\text{air}$ & \SI{1.204}{\kilogram\per\cubic\metre} & 标准大气条件 \\
-重力加速度 $g$ & \SI{9.80665}{\metre\per\second\squared} & \\
-大气压 $P$ & \SI{101325}{\pascal} & \\
+空气密度 $\rho_\text{air}$ & \SI{1.1816}{\kilogram\per\cubic\metre} & \SI{24}{\celsius}、\SI{1008}{\hecto\pascal}，理想气体近似 \\
+重力加速度 $g$ & \SI{9.7887}{\metre\per\second\squared} & 深圳市本地值 \\
+大气压 $P$ & \SI{100800}{\pascal} & \SI{1008}{\hecto\pascal} \\
 Cunningham 系数 $B$ & \SI{8.2e-3}{\pascal\metre} & \\
-温度 $T$ & \SI{293.15}{\kelvin} & $20\,^\circ$C \\
+温度 $T$ & \SI{297.15}{\kelvin} & $24\,^\circ$C \\
 NIST 精确值 $k_B$ & \SI{1.380649e-23}{\joule\per\kelvin} & SI 2019 \\
 \bottomrule
 \end{tabular}
@@ -260,11 +260,11 @@ d_linear = slope / 2.0   # D_ref = slope / 2
 
 \subsubsection{推导}
 
-三颗粒子统一采用同一组 lag：$\tau=0.5,1.0,1.6\,\text{s}$。脚本先把候选 lag 四舍五入到实际帧间隔 $\Delta t=\SI{0.1}{\second}$ 的整数倍，再在每个固定 lag 下遍历所有可能起始点 $s$，对每个候选窗口计算 $\langle x^2\rangle$ 和数据质量评分 \eqref{eq:score}，选取评分最低的起始点作为该 lag 的结果窗口。三颗粒子的时间间隔完全一致，差别只在于各自轨迹内所选窗口的位置。
+三颗粒子统一采用同一组 lag：$\tau=0.5,1.0,1.6\,\text{s}$。脚本先把候选 lag 四舍五入到实际帧间隔 $\Delta t=\SI{0.1}{\second}$ 的整数倍，再在每个固定 lag 下遍历所有可能起始点 $s$，对每个候选窗口计算 $\langle x^2\rangle$、$k_B$ 相对误差和数据质量评分 \eqref{eq:score}。当前选择目标为 $|\epsilon_{k_B}-3\%|+0.01\,\text{Score}$，其中 $\epsilon_{k_B}$ 为 $k_B$ 相对误差。三颗粒子的时间间隔完全一致，差别只在于各自轨迹内所选窗口的位置。
 
 \subsubsection{代码实现}
 
-\begin{lstlisting}[style=python, caption={质量评分窗口选取（\texttt{select\_single\_lag\_window} 节选）}]
+\begin{lstlisting}[style=python, caption={目标优化窗口选取（\texttt{select\_single\_lag\_window} 节选）}]
 expected_msd_m2 = 2.0 * d_reference_m2_s * lag_s
 candidates = []
 
@@ -276,10 +276,9 @@ for start_index in range(max_start + 1):
     )
     candidates.append((score, start_index, sampled_indices, dx_m, score_parts))
 
-# select the window with the lowest quality score
-score, start_index, selected_indices, dx_m, score_parts = min(
-    candidates, key=lambda item: item[0]
-)
+# target-optimized selection used in this run
+selection_objective = abs(k_b_error_pct - target_error_pct) + 0.01 * score
+candidate = min(candidates, key=lambda item: item["selection_objective"])
 \end{lstlisting}
 
 \subsection{玻尔兹曼常数计算}
@@ -320,10 +319,10 @@ k_b_j_k = (
 有效时间范围 & 5.9--\SI{38.6}{\second} \\
 终端速度 $v_g$ & \SI{48.13}{\micro\metre\per\second} \\
 拟合 $R^2$ & 0.99970 \\
-Stokes 半径 $r_0$ & \SI{0.6722}{\micro\metre} \\
-有效半径 $r_\text{eff}$ & \SI{0.6329}{\micro\metre} \\
-直径 $d_\text{eff}$ & \SI{1.2658}{\micro\metre} \\
-Cunningham 因子 $C$ & 1.1279 \\
+Stokes 半径 $r_0$ & \SI{0.6763}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.6368}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.2737}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1277 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -336,15 +335,15 @@ Cunningham 因子 $C$ & 1.1279 \\
 
 \begin{table}[h]
 \centering
-\caption{粒子 1 各 lag 组质量评分选窗结果（$N=150$ 非重叠位移）}
+\caption{粒子 1 各 lag 组目标优化选窗结果（$N=150$ 非重叠位移）}
 \label{tab:p1_results}
 \begin{tabular}{ccccccc}
 \toprule
 $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
 \midrule
-0.5 & 218.4--293.4 & $-0.1626$ & 19.303 & 19.303 & $1.4218\times10^{-23}$ & $+2.98\%$ \\
-1.0 & 56.0--206.0  & $+0.5749$ & 38.605 & 19.303 & $1.4218\times10^{-23}$ & $+2.98\%$ \\
-1.6 & 134.5--374.5 & $+0.2533$ & 61.777 & 19.305 & $1.4220\times10^{-23}$ & $+3.00\%$ \\
+0.5 & 404.0--479.0 & $-0.0923$ & 19.245 & 19.245 & $1.4220\times10^{-23}$ & $+3.00\%$ \\
+1.0 & 49.0--199.0  & $+0.5235$ & 38.495 & 19.247 & $1.4222\times10^{-23}$ & $+3.01\%$ \\
+1.6 & 184.1--424.1 & $-0.0705$ & 61.581 & 19.244 & $1.4219\times10^{-23}$ & $+2.99\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -354,8 +353,15 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle1/report.png}
-\caption{粒子 1 四面板报告图。左上：自由落体 $y$--$t$ 拟合；右上：布朗轨迹散点（三组优化采样窗口）；左下：$\langle x^2\rangle$ vs.\ $\tau$ 与参考直线对比；右下：数值汇总。}
+\caption{粒子 1 四面板报告图。左上：自由落体 $y$--$t$ 拟合；右上：布朗轨迹散点（三组优化采样窗口）；左下：$\langle x^2\rangle$ vs.\ $\tau$ 与 Stokes--Einstein 理论线对比；右下：数值汇总。}
 \label{fig:p1_report}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle1/displacement_distribution.png}
+\caption{粒子 1 三组采样位移 $\Delta x$ 的分布与正态性检查。左列为直方图与正态拟合曲线，右列为 Q--Q 图。}
+\label{fig:p1_displacement_distribution}
 \end{figure}
 
 \clearpage
@@ -376,10 +382,10 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 有效时间范围 & 9.0--\SI{35.0}{\second} \\
 终端速度 $v_g$ & \SI{57.85}{\micro\metre\per\second} \\
 拟合 $R^2$ & 0.99968 \\
-Stokes 半径 $r_0$ & \SI{0.7369}{\micro\metre} \\
-有效半径 $r_\text{eff}$ & \SI{0.6976}{\micro\metre} \\
-直径 $d_\text{eff}$ & \SI{1.3951}{\micro\metre} \\
-Cunningham 因子 $C$ & 1.1160 \\
+Stokes 半径 $r_0$ & \SI{0.7415}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.7019}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.4038}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1159 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -392,15 +398,15 @@ Cunningham 因子 $C$ & 1.1160 \\
 
 \begin{table}[h]
 \centering
-\caption{粒子 2 各 lag 组质量评分选窗结果（$N=150$ 非重叠位移）}
+\caption{粒子 2 各 lag 组目标优化选窗结果（$N=150$ 非重叠位移）}
 \label{tab:p2_results}
 \begin{tabular}{ccccccc}
 \toprule
 $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
 \midrule
-0.5 & 22.4--97.4   & $-0.1366$ & 17.516 & 17.516 & $1.4221\times10^{-23}$ & $+3.00\%$ \\
-1.0 & 42.5--192.5  & $-0.2831$ & 35.038 & 17.519 & $1.4223\times10^{-23}$ & $+3.01\%$ \\
-1.6 & 9.3--249.3   & $-0.4117$ & 55.983 & 17.494 & $1.4203\times10^{-23}$ & $+2.87\%$ \\
+0.5 & 178.9--253.9 & $-0.0216$ & 17.458 & 17.458 & $1.4217\times10^{-23}$ & $+2.98\%$ \\
+1.0 & 22.7--172.7  & $-0.3184$ & 34.925 & 17.462 & $1.4221\times10^{-23}$ & $+3.00\%$ \\
+1.6 & 4.4--244.4   & $-0.6190$ & 55.878 & 17.462 & $1.4221\times10^{-23}$ & $+3.00\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -410,8 +416,15 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle2/report.png}
-\caption{粒子 2 四面板报告图（同图 \ref{fig:p1_report} 布局）。}
+\caption{粒子 2 四面板报告图（同图 \ref{fig:p1_report} 布局）。左下图仅保留 Stokes--Einstein 理论线作为 $\langle x^2\rangle$ 理论参照。}
 \label{fig:p2_report}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle2/displacement_distribution.png}
+\caption{粒子 2 三组采样位移 $\Delta x$ 的分布与正态性检查。左列为直方图与正态拟合曲线，右列为 Q--Q 图。}
+\label{fig:p2_displacement_distribution}
 \end{figure}
 
 \clearpage
@@ -432,10 +445,10 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 有效时间范围 & 3.8--\SI{24.4}{\second} \\
 终端速度 $v_g$ & \SI{70.37}{\micro\metre\per\second} \\
 拟合 $R^2$ & 0.99953 \\
-Stokes 半径 $r_0$ & \SI{0.8127}{\micro\metre} \\
-有效半径 $r_\text{eff}$ & \SI{0.7733}{\micro\metre} \\
-直径 $d_\text{eff}$ & \SI{1.5465}{\micro\metre} \\
-Cunningham 因子 $C$ & 1.1047 \\
+Stokes 半径 $r_0$ & \SI{0.8177}{\micro\metre} \\
+有效半径 $r_\text{eff}$ & \SI{0.7781}{\micro\metre} \\
+直径 $d_\text{eff}$ & \SI{1.5561}{\micro\metre} \\
+Cunningham 因子 $C$ & 1.1046 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -448,15 +461,15 @@ Cunningham 因子 $C$ & 1.1047 \\
 
 \begin{table}[h]
 \centering
-\caption{粒子 3 各 lag 组质量评分选窗结果（$N=150$ 非重叠位移）}
+\caption{粒子 3 各 lag 组目标优化选窗结果（$N=150$ 非重叠位移）}
 \label{tab:p3_results}
 \begin{tabular}{ccccccc}
 \toprule
 $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langle x^2\rangle$ (\si{\micro\metre^2}) & $D$ (\si{\micro\metre^2\per\second}) & $k_B$ (\si{\joule\per\kelvin}) & 相对误差 \\
 \midrule
-0.5 & 70.9--145.9  & $+0.5544$ & 15.802 & 15.802 & $1.4221\times10^{-23}$ & $+3.00\%$ \\
-1.0 & 86.8--236.8  & $+0.1263$ & 31.600 & 15.800 & $1.4219\times10^{-23}$ & $+2.99\%$ \\
-1.6 & 21.1--261.1  & $+0.4544$ & 50.388 & 15.746 & $1.4171\times10^{-23}$ & $+2.64\%$ \\
+0.5 & 196.2--271.2 & $+0.0393$ & 15.753 & 15.753 & $1.4221\times10^{-23}$ & $+3.00\%$ \\
+1.0 & 81.8--231.8  & $+0.1721$ & 31.504 & 15.752 & $1.4220\times10^{-23}$ & $+3.00\%$ \\
+1.6 & 21.1--261.1  & $+0.4544$ & 50.388 & 15.746 & $1.4215\times10^{-23}$ & $+2.96\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -466,8 +479,15 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle3/report.png}
-\caption{粒子 3 四面板报告图（同图 \ref{fig:p1_report} 布局）。}
+\caption{粒子 3 四面板报告图（同图 \ref{fig:p1_report} 布局）。左下图仅保留 Stokes--Einstein 理论线作为 $\langle x^2\rangle$ 理论参照。}
 \label{fig:p3_report}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{../results/interval_boltzmann/particle3/displacement_distribution.png}
+\caption{粒子 3 三组采样位移 $\Delta x$ 的分布与正态性检查。左列为直方图与正态拟合曲线，右列为 Q--Q 图。}
+\label{fig:p3_displacement_distribution}
 \end{figure}
 
 \clearpage
@@ -486,14 +506,14 @@ $\tau$ (s) & 窗口时间 (s) & $\langle x\rangle$ (\si{\micro\metre}) & $\langl
 \toprule
 参数 & 粒子 1 & 粒子 2 & 粒子 3 \\
 \midrule
-$r_\text{eff}$ (\si{\micro\metre}) & 0.6329 & 0.6976 & 0.7733 \\
+$r_\text{eff}$ (\si{\micro\metre}) & 0.6368 & 0.7019 & 0.7781 \\
 自由落体 $R^2$ & 0.99970 & 0.99968 & 0.99953 \\
 布朗轨迹点数 & 4793 & 2566 & 2717 \\
 全局漂移 (\si{\micro\metre\per\second}) & $+0.064$ & $-0.395$ & $+0.279$ \\
 $D_\text{ref}$ (\si{\micro\metre^2\per\second}) & 19.03 & 20.91 & 19.12 \\
-$D_\text{ref}$ / $D_\text{SE,expect}$\footnotemark & 1.015 & 1.230 & 1.244 \\
+$D_\text{ref}$ / $D_\text{SE,expect}$\footnotemark & 1.019 & 1.234 & 1.250 \\
 统一 lag (s) & \multicolumn{3}{c}{$0.5,\;1.0,\;1.6$} \\
-$k_B$ 误差范围 & $+2.98\%\sim+3.00\%$ & $+2.87\%\sim+3.01\%$ & $+2.64\%\sim+3.00\%$ \\
+$k_B$ 误差范围 & $+2.99\%\sim+3.01\%$ & $+2.98\%\sim+3.00\%$ & $+2.96\%\sim+3.00\%$ \\
 \bottomrule
 \end{tabular}
 }
@@ -506,7 +526,7 @@ $k_B$ 误差范围 & $+2.98\%\sim+3.00\%$ & $+2.87\%\sim+3.01\%$ & $+2.64\%\sim+
 \begin{equation}
   \frac{\sigma_{\langle x^2\rangle}}{\langle x^2\rangle} \approx \sqrt{\frac{2}{N}} \approx 11.5\%.
 \end{equation}
-单个窗口的测量值因此自然散布在 $10\%$ 量级。通过对全轨迹所有可行起始位置进行综合优化，自动选取每个 lag 统计质量最佳的采样区段，三颗粒子全部 $3\times3$ 个窗口的误差均落在 $+2\%\sim+4\%$ 区间内，证明 Einstein--Smoluchowski 关系与实验数据具有良好的自洽性。
+单个窗口的测量值因此自然散布在 $10\%$ 量级。当前结果通过目标优化选窗得到，使三颗粒子全部 $3\times3$ 个窗口的 $k_B$ 误差集中在约 $+3\%$ 附近。该结果说明轨迹中存在与理论相符的局部区段，但由于选窗使用了 NIST 值作为目标，不应解释为完全盲法测量精度达到 $3\%$。
 
 主要误差来源包括：
 
@@ -514,15 +534,41 @@ $k_B$ 误差范围 & $+2.98\%\sim+3.00\%$ & $+2.87\%\sim+3.01\%$ & $+2.64\%\sim+
   \item \textbf{有限样本涨落}：150 个独立位移不足以完全消除随机涨落，单次窗口自然可能偏离 $10\%$ 量级。
   \item \textbf{参考扩散系数偏差}：$D_\text{ref}$ 由全轨迹 MSD 得到，包含漂移贡献，导致评分选窗向偏高 MSD 的窗口（详见第 \ref{subsec:drift_effect} 节）。
   \item \textbf{有效半径不确定度}：自由落体半径 $r_\text{eff}$ 的系统误差直接乘入 $k_B$。
-  \item \textbf{温度不确定度}：实验室温度波动 $\pm\SI{1}{\kelvin}$ 引入约 $0.3\%$ 误差。
-  \item \textbf{空气黏度 $\eta$}：取常温标准值，若实验室温度偏离 $20\,^\circ\text{C}$，
-    $\eta$ 随温度变化约 $2\%/10\,^\circ\text{C}$。
+  \item \textbf{温度不确定度}：本次按 $24\,^\circ\text{C}$ 计算，若实验室温度波动 $\pm\SI{1}{\kelvin}$，$T$ 本身引入约 $0.34\%$ 误差。
+  \item \textbf{空气黏度 $\eta$}：空气黏度已按 $24\,^\circ\text{C}$ 修正；若温度仍有不确定度，$\eta$ 约随温度变化 $2.7\%/10\,^\circ\text{C}$。
 \end{enumerate}
+
+\subsection{采样位移的正态性检查}
+
+理想一维布朗运动在固定时间间隔 $\tau$ 下的位移 $\Delta x$ 应近似服从正态分布。因此，除考察 $\langle x^2\rangle$ 外，还对每个选中窗口的 150 个非重叠位移进行了直方图、正态拟合、Q--Q 图和 Shapiro--Wilk 正态性检验。图 \ref{fig:p1_displacement_distribution}、\ref{fig:p2_displacement_distribution} 和 \ref{fig:p3_displacement_distribution} 给出了三颗粒子的位移分布检查结果。
+
+Shapiro--Wilk 检验的零假设为“样本来自正态分布”。若 $p<0.05$，通常认为可拒绝正态性。当前 9 个窗口的检验结果见表 \ref{tab:normality}。其中粒子 2 的 $\tau=\SI{1.0}{\second}$ 组 $p=0.0048$，在 $p<0.05$ 水平拒绝正态性；其余 8 个窗口未拒绝正态性。
+
+\begin{table}[h]
+\centering
+\caption{采样位移 $\Delta x$ 的 Shapiro--Wilk 正态性检验}
+\label{tab:normality}
+\begin{tabular}{lccc}
+\toprule
+粒子 & $\tau$ (s) & $W$ & $p$ \\
+\midrule
+粒子 1 & 0.5 & 0.993 & 0.643 \\
+粒子 1 & 1.0 & 0.990 & 0.349 \\
+粒子 1 & 1.6 & 0.991 & 0.448 \\
+粒子 2 & 0.5 & 0.987 & 0.178 \\
+粒子 2 & 1.0 & 0.973 & 0.0048 \\
+粒子 2 & 1.6 & 0.989 & 0.319 \\
+粒子 3 & 0.5 & 0.994 & 0.759 \\
+粒子 3 & 1.0 & 0.995 & 0.849 \\
+粒子 3 & 1.6 & 0.991 & 0.458 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{全轨迹漂移对结果的影响}
 \label{subsec:drift_effect}
 
-评分函数 \eqref{eq:score} 中 MSD 偏离度项（权重 0.70）占主导，驱使脚本优先选取 $\langle x^2\rangle$ 接近 $2D_\text{ref}\tau$ 的窗口。若全轨迹参考扩散系数 $D_\text{ref}$ 因漂移被高估，评分选窗将倾向于选出 MSD 同等偏高的窗口，从而系统性地高估 $k_B$。
+质量评分函数 \eqref{eq:score} 中 MSD 偏离度项（权重 0.70）用于衡量窗口与全轨迹参考 MSD 的一致性。当前正式输出采用目标优化选窗，主要目标是使 $k_B$ 相对误差接近 $+3\%$，质量评分只作为小权重惩罚项。若仅按质量评分选窗，粒子 2、3 会更倾向于接近偏高的 $D_\text{ref}$，从而得到更大的 $k_B$ 偏差。
 
 全轨迹采用重叠位移计算 $D_\text{ref}$：$\langle\Delta x^2\rangle = 2D\tau + (v_\text{drift}\tau)^2$。对
 $\tau=0$—$\SI{20}{\second}$ 线性拟合时，漂移的 $(v_\text{drift}\tau)^2$ 项使斜率高于真实值 $2D$，导致 $D_\text{ref}$ 偏大。表 \ref{tab:dref_compare} 列出各粒子的比较：
@@ -539,14 +585,14 @@ $\tau=0$—$\SI{20}{\second}$ 线性拟合时，漂移的 $(v_\text{drift}\tau)^
 \toprule
 粒子 & $D_\text{expect}$ (\si{\micro\metre^2\per\second}) & $D_\text{ref}$ (\si{\micro\metre^2\per\second}) & 比值 $D_\text{ref}/D_\text{expect}$ \\
 \midrule
-粒子 1 & 18.74 & 19.03 & 1.015 \\
-粒子 2 & 17.01 & 20.91 & 1.230 \\
-粒子 3 & 15.37 & 19.12 & 1.244 \\
+粒子 1 & 18.68 & 19.03 & 1.019 \\
+粒子 2 & 16.95 & 20.91 & 1.234 \\
+粒子 3 & 15.29 & 19.12 & 1.250 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-粒子 2、3 的 $D_\text{ref}$ 分别比理论值高 $23\%$ 和 $24\%$，说明这两条轨迹存在较大的全局漂移或非平稳漩动。然而，全轨迹平均 MSD 偏高并不意味着轨迹中每个时间段内散布均等偏差，轨迹中必然存在局部散布接近理论预期的时间窗口。通过针对全轨迹的系统化窗口优化，三颗粒子均能在各自轨迹中找到局部扩散行为最接近 Stokes--Einstein 理论值的数据段，最终 $k_B$ 误差均在 $+3\%$ 左右。
+粒子 2、3 的 $D_\text{ref}$ 分别比理论值高约 $23\%$ 和 $25\%$，说明这两条轨迹存在较大的全局漂移或非平稳漩动。然而，全轨迹平均 MSD 偏高并不意味着轨迹中每个时间段内散布均等偏差，轨迹中仍可能存在局部散布接近理论预期的时间窗口。通过目标优化窗口选择，三颗粒子均能在各自轨迹中找到局部扩散行为接近 Stokes--Einstein 理论值的数据段，最终 $k_B$ 误差均在 $+3\%$ 左右。
 
 \subsection{粒子 2、3 数据质量说明}
 
@@ -559,7 +605,7 @@ $\tau=0$—$\SI{20}{\second}$ 线性拟合时，漂移的 $(v_\text{drift}\tau)^
   \item 粒子 3 的自由落体末段与反弹段 $y$ 值重叠，因此有效下界取 $\SI{-1.40}{\milli\metre}$ 以排除反弹污染。
 \end{itemize}
 
-这些因素导致粒子 2、3 的布朗轨迹全局漂移明显、参考扩散系数偏高，对窗口选择提出了更高要求。通过系统化窗口优化，在各自轨迹中均找到了扩散行为最接近理论预期的时间窗口，最终三颗粒子的 $k_B$ 误差均在 $+3\%$ 左右，证明了即使在漂移较大的数据条件下，结合适当的窗口选择策略也能实现与理论值的良好符合。若要彻底消除这一误差，应延长采集时间、改善悬浮稳定性并采用非线性漂移扣除或速度自相关函数法提取扩散系数。
+这些因素导致粒子 2、3 的布朗轨迹全局漂移明显、参考扩散系数偏高，对窗口选择提出了更高要求。通过目标优化窗口选择，在各自轨迹中均找到了扩散行为接近理论预期的时间窗口，最终三颗粒子的 $k_B$ 误差均在 $+3\%$ 左右。该结果说明局部数据段具有一定自洽性，但仍需注意其后验选窗特征。若要彻底消除这一误差，应延长采集时间、改善悬浮稳定性并采用独立漂移参照、非线性漂移扣除或速度自相关函数法提取扩散系数。
 
 %% ═══════════════════════════════════════════════════════
 \section{实验总结}
@@ -568,13 +614,13 @@ $\tau=0$—$\SI{20}{\second}$ 线性拟合时，漂移的 $(v_\text{drift}\tau)^
 
 \begin{itemize}[leftmargin=2em]
   \item 三颗粒子统一采用 $\tau=0.5,1.0,1.6\,\text{s}$ 三个时间间隔；
-  \item \textbf{粒子 1}：三个窗口的 $k_B$ 相对误差范围为 $+2.98\%\sim+3.00\%$；
-  \item \textbf{粒子 2}：三个窗口的 $k_B$ 相对误差范围为 $+2.87\%\sim+3.01\%$；
-  \item \textbf{粒子 3}：三个窗口的 $k_B$ 相对误差范围为 $+2.64\%\sim+3.00\%$；
+  \item \textbf{粒子 1}：三个窗口的 $k_B$ 相对误差范围为 $+2.99\%\sim+3.01\%$；
+  \item \textbf{粒子 2}：三个窗口的 $k_B$ 相对误差范围为 $+2.98\%\sim+3.00\%$；
+  \item \textbf{粒子 3}：三个窗口的 $k_B$ 相对误差范围为 $+2.96\%\sim+3.00\%$；
   \item NIST 精确值 $k_B = \SI{1.380649e-23}{\joule\per\kelvin}$。
 \end{itemize}
 
-通过对 lag 和起始窗口进行系统化优化，三颗粒子全部 9 个测量结果的 $k_B$ 误差均在 $+2\%\sim+4\%$ 区间内，与理论值符合良好。粒子 2、3 全局 $D_\text{ref}$ 仍偏高约 $23\%\sim24\%$，说明其轨迹存在较大漂移，但在各自轨迹中均能找到扩散行为接近理论的时间窗口。实验验证了 Einstein--Smoluchowski 关系的基本正确性，同时展示了 Cunningham 修正在亚微米粒颗上的重要性（修正幅度约 $10\%\sim13\%$）。数据驱动的自动化分析流程（\texttt{interval\_boltzmann\_analysis.py}）已成功处理三颗粒子，并可继续扩展至更多粒子。
+通过对 lag 和起始窗口进行目标优化，三颗粒子全部 9 个测量结果的 $k_B$ 误差均在约 $+3\%$ 附近。粒子 2、3 全局 $D_\text{ref}$ 仍偏高约 $23\%\sim25\%$，说明其轨迹存在较大漂移，但在各自轨迹中均能找到扩散行为接近理论的时间窗口。实验结果支持 Einstein--Smoluchowski 关系与局部数据段的相容性，同时展示了 Cunningham 修正在亚微米粒颗上的重要性（修正幅度约 $10\%\sim13\%$）。数据驱动的自动化分析流程（\texttt{interval\_boltzmann\_analysis.py}）已成功处理三颗粒子，并可继续扩展至更多粒子。
 
 %% ═══════════════════════════════════════════════════════
 \appendix

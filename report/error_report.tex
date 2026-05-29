@@ -1,0 +1,146 @@
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\sisetup{separate-uncertainty=true, per-mode=symbol}
+
+\title{\textbf{布朗运动测量玻尔兹曼常数实验\\误差与偏移项分析说明}}
+\author{Steven Chen}
+\date{2026 年 5 月}
+
+\begin{document}
+\maketitle
+
+\section{说明目的}
+
+本文用于向组员说明当前数据处理中发现的主要误差来源，尤其是布朗运动轨迹中可能存在的慢漂移项对均方位移（MSD）和玻尔兹曼常数 $k_B$ 测量的影响。
+
+结论先行：当前报告中的数值计算本身可以复现，但第二、第三颗粒子的原始布朗轨迹存在明显的非理想成分。若直接用全轨迹 MSD 作为参考，粒子 2 和粒子 3 的扩散系数会被抬高约 $23\%$--$25\%$。因此，当前数据更适合描述为“存在漂移污染的数据分析”，不宜简单表述为完全理想的布朗运动测量。
+
+\section{理想模型与偏移项}
+
+理想的一维布朗运动满足
+\begin{equation}
+  \langle \Delta x \rangle = 0, \qquad
+  \langle \Delta x^2(\tau) \rangle = 2D\tau .
+\end{equation}
+
+实验中观测到的位置往往不只是纯布朗运动，可写成
+\begin{equation}
+  x_{\mathrm{obs}}(t)=x_{\mathrm{B}}(t)+x_{\mathrm{drift}}(t)+\epsilon(t),
+\end{equation}
+其中 $x_{\mathrm{B}}(t)$ 是布朗运动，$x_{\mathrm{drift}}(t)$ 是慢漂移，$\epsilon(t)$ 是定位噪声。
+
+若漂移近似为匀速 $v_{\mathrm{d}}$，则位移为
+\begin{equation}
+  \Delta x_{\mathrm{obs}} = \Delta x_{\mathrm{B}} + v_{\mathrm{d}}\tau .
+\end{equation}
+于是均方位移变为
+\begin{equation}
+  \langle \Delta x_{\mathrm{obs}}^2 \rangle
+  \approx 2D\tau + (v_{\mathrm{d}}\tau)^2 .
+\end{equation}
+
+这个额外的 $(v_{\mathrm{d}}\tau)^2$ 项会使 MSD 偏大。更一般地，若轨迹中存在气流、电场不稳定、液滴缓慢移动或局部非平稳运动，也会在长时间尺度上抬高 MSD。
+
+\section{当前实验中的显著误差}
+
+当前三颗粒子的全轨迹参考扩散系数 $D_{\mathrm{ref}}$ 与理论 Stokes--Einstein 期望值 $D_{\mathrm{expect}}$ 的比较如下：
+
+\begin{table}[h]
+\centering
+\caption{全轨迹参考扩散系数与理论值对比}
+\begin{tabular}{lccc}
+\toprule
+粒子 & $D_{\mathrm{ref}}$ ($\si{\micro\metre^2\per\second}$) & $D_{\mathrm{expect}}$ ($\si{\micro\metre^2\per\second}$) & 比值 \\
+\midrule
+粒子 1 & 19.03 & 18.68 & 1.019 \\
+粒子 2 & 20.91 & 16.95 & 1.234 \\
+粒子 3 & 19.12 & 15.29 & 1.250 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+可以看到，粒子 1 与理论值基本接近；粒子 2 和粒子 3 的 $D_{\mathrm{ref}}$ 明显偏大，分别约为理论值的 $1.23$ 倍和 $1.25$ 倍。
+
+这意味着：若直接把全轨迹 MSD 当作理想布朗运动参考，粒子 2 和粒子 3 的 $\langle x^2\rangle$ 会系统性偏大。若用这些偏大的 MSD 计算 $k_B$，也会得到明显偏大的 $k_B$。
+
+\section{窗口选择带来的方法问题}
+
+当前程序中使用了目标优化窗口选择策略，即通过选择局部区间，使计算出的 $k_B$ 接近预设目标。这个做法可以找到“数值上较好”的局部窗口，但它不是完全盲法测量。
+
+独立复算显示：若固定当前被选中的窗口，$k_B$ 的数值计算是正确的，误差约为 $+2.6\%$ 到 $+3.0\%$。但是，如果只按统计质量评分选窗口，粒子 2 和粒子 3 的 $k_B$ 误差会接近 $+20\%$ 以上。
+
+因此当前结果应谨慎表述为：在轨迹中选取了局部较合适的时间区间后，得到接近理论值的结果。不能简单表述为整条原始轨迹都与理想布朗运动高度一致。
+
+\section{可能导致误差的原因}
+
+根据数据表现，主要可能原因包括：
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{悬浮不稳定或气流扰动：} 油滴在悬浮时可能受到微弱空气流动或热对流影响，产生低频定向运动。
+  \item \textbf{电场或仪器漂移：} 密立根装置中的电场不均匀、平台振动或成像系统漂移可能导致油滴位置缓慢移动。
+  \item \textbf{有限轨迹长度：} 粒子 2 和粒子 3 的布朗轨迹长度明显短于粒子 1，统计平均不充分。
+  \item \textbf{单窗口样本数不足：} 当前每个窗口使用 $N=150$ 个独立位移，理论相对标准误差约为
+  \begin{equation}
+    \sqrt{\frac{2}{N}} = \sqrt{\frac{2}{150}} \approx 11.5\% .
+  \end{equation}
+  因此单个窗口天然会有 $10\%$ 量级的随机波动。
+  \item \textbf{长时间 MSD 对漂移敏感：} 用较长 lag 拟合 MSD 时，漂移项 $(v_{\mathrm{d}}\tau)^2$ 的影响会增强。
+\end{enumerate}
+
+\section{关于慢漂移扣除的说明}
+
+一种尝试是对轨迹做低频去趋势，例如用 $80\,\mathrm{s}$ 滚动平均估计慢漂移：
+\begin{equation}
+  x_{\mathrm{slow}}(t)=\mathrm{rolling\ mean}_{80\mathrm{s}}[x(t)],
+\end{equation}
+再构造
+\begin{equation}
+  x_{\mathrm{corr}}(t)=x(t)-x_{\mathrm{slow}}(t)+\overline{x} .
+\end{equation}
+
+这个方法可以明显降低粒子 2 和粒子 3 的 MSD 偏差，使 $D_{\mathrm{ref}}$ 更接近理论值。但它有重要限制：$x_{\mathrm{slow}}(t)$ 是从油滴自身轨迹中估计出来的，可能同时扣除了真实布朗运动中的低频涨落。因此它更适合作为“漂移敏感性分析”，不应直接作为严格的主实验结论。
+
+更中立的表述是：低频去趋势说明当前结果对慢漂移较敏感；去趋势后数值改善，支持“原始轨迹中存在低频漂移污染”的判断。
+
+\section{建议的解决方案}
+
+\subsection{数据分析层面}
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{报告原始轨迹结果与去趋势结果两套结果：} 原始结果代表直接测量；去趋势结果作为漂移校正后的参考。
+  \item \textbf{缩短参考 MSD 拟合范围：} 例如比较 $\tau \le 2\,\mathrm{s}$、$5\,\mathrm{s}$、$10\,\mathrm{s}$、$20\,\mathrm{s}$ 的 $D_{\mathrm{ref}}$，避免长 lag 被漂移放大。
+  \item \textbf{做分段稳定性检查：} 每隔固定时间计算局部 $D$、局部平均位移和漂移斜率，判断哪些时间段不稳定。
+  \item \textbf{避免用 NIST 值直接选窗作为主结论：} 若使用目标优化窗口，应明确说明这是后验选择或校准选窗。
+  \item \textbf{给出统计不确定度：} 对 $N=150$ 的单窗口结果，应说明理论随机误差约 $11.5\%$，不能声称单窗口自然达到 $2\%$--$3\%$ 精度。
+\end{enumerate}
+
+\subsection{实验采集层面}
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{延长采集时间：} 若希望单窗口统计误差达到 $3\%$，理论上需要约 $N\approx 2222$ 个独立位移，远大于当前 $N=150$。
+  \item \textbf{等待悬浮稳定后再记录：} 减少开始阶段的电场调节和油滴松弛过程。
+  \item \textbf{控制气流和温漂：} 尽量封闭观察区域，减少热对流和外界扰动。
+  \item \textbf{记录参照物或多颗粒子：} 若能同时记录固定背景点或多颗粒子，可用公共漂移进行更物理可靠的漂移扣除。
+  \item \textbf{记录二维坐标：} 同时使用 $x$ 和 $y$ 的布朗涨落可提高统计量，但需避免竖直方向受电场或重力影响。
+\end{enumerate}
+
+\section{总结}
+
+当前实验的主要问题不是公式计算错误，而是粒子 2 和粒子 3 的原始轨迹中存在明显低频非理想运动，使全轨迹 MSD 偏大。慢漂移扣除可以改善数值，但由于它从油滴自身轨迹中估计漂移，可能同时滤除真实布朗运动的低频成分，因此只能作为辅助分析。
+
+对组内讨论，建议采用如下表述：
+
+\begin{quote}
+当前数据表明粒子 2 和粒子 3 的布朗轨迹受到慢漂移或非平稳运动影响。原始全轨迹 MSD 给出的扩散系数偏高约 $23\%$--$25\%$。通过局部选窗或低频去趋势可以得到更接近理论的结果，但这类处理需要明确说明其后验性和模型假设。若要获得更可靠的独立测量，应改进采集稳定性、延长轨迹长度，并使用独立参照物或多粒子数据估计漂移。
+\end{quote}
+
+\end{document}

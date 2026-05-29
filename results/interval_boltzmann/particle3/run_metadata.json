@@ -27,9 +27,9 @@
     "valid_points": 207,
     "all_points": 348,
     "terminal_velocity_m_s": 7.036663806539597e-05,
-    "radius_stokes_m": 8.127313871929667e-07,
-    "radius_cunningham_m": 7.732742066246163e-07,
-    "cunningham_factor": 1.1046558997796745,
+    "radius_stokes_m": 8.177338523288193e-07,
+    "radius_cunningham_m": 7.780702145726254e-07,
+    "cunningham_factor": 1.1045525260132074,
     "r_squared": 0.9995258243035896
   },
   "brownian": {
@@ -42,10 +42,10 @@
     "reference_r_squared": 0.9996980592105945
   },
   "constants": {
-    "eta_pa_s": 1.81e-05,
+    "eta_pa_s": 1.8290424419e-05,
     "rho_oil_kg_m3": 886.0,
-    "rho_air_kg_m3": 1.204,
-    "temperature_k": 293.15,
+    "rho_air_kg_m3": 1.181638331,
+    "temperature_k": 297.15,
     "k_b_true_j_k": 1.380649e-23
   }
 }
