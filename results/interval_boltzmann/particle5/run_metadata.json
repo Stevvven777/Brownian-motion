@@ -1,0 +1,51 @@
+{
+  "particle_id": "particle5",
+  "inputs": {
+    "drop_file": "P5_drop.txt",
+    "brown_file": "P5_brown.txt",
+    "drop_valid_y_min_mm": -1.06,
+    "drop_valid_y_max_mm": 0.3,
+    "lags_s": [
+      0.5,
+      1.0,
+      1.6
+    ],
+    "selection_strategy": "target_kb",
+    "lag_search_s": [
+      0.5,
+      1.0,
+      1.6
+    ],
+    "n_lag_groups": 3,
+    "min_lag_separation_s": 0.0,
+    "target_max_error_pct": null,
+    "target_error_pct": 3.0,
+    "n_displacements": 150,
+    "reference_max_lag_s": 20.0
+  },
+  "freefall": {
+    "valid_points": 286,
+    "all_points": 403,
+    "terminal_velocity_m_s": 4.834201349100195e-05,
+    "radius_stokes_m": 6.777834241103147e-07,
+    "radius_cunningham_m": 6.38328190149632e-07,
+    "cunningham_factor": 1.127441036765331,
+    "r_squared": 0.9994308722042078
+  },
+  "brownian": {
+    "n_points": 6776,
+    "n_missing_raw": 62,
+    "n_missing_interpolated": 62,
+    "dt_s": 0.10000000000000142,
+    "global_drift_m_s": -2.768871334155326e-07,
+    "reference_d_linear_m2_s": 1.9518793476967003e-11,
+    "reference_r_squared": 0.9967140735231708
+  },
+  "constants": {
+    "eta_pa_s": 1.8290424419e-05,
+    "rho_oil_kg_m3": 886.0,
+    "rho_air_kg_m3": 1.181638331,
+    "temperature_k": 297.15,
+    "k_b_true_j_k": 1.380649e-23
+  }
+}

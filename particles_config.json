@@ -64,6 +64,22 @@
       "target_error_pct": 3.0,
       "n_displacements": 150,
       "reference_max_lag_s": 20.0
+    },
+    {
+      "particle_id": "particle5",
+      "drop_file": "P5_drop.txt",
+      "brown_file": "P5_brown.txt",
+      "drop_valid_y_min_mm": -1.06,
+      "drop_valid_y_max_mm": 0.30,
+      "lags_s": [0.5, 1.0, 1.6],
+      "selection_strategy": "target_kb",
+      "lag_search_s": [0.5, 1.0, 1.6],
+      "n_lag_groups": 3,
+      "min_lag_separation_s": 0.0,
+      "target_max_error_pct": null,
+      "target_error_pct": 3.0,
+      "n_displacements": 150,
+      "reference_max_lag_s": 20.0
     }
   ]
 }
