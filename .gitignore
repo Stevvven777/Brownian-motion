@@ -46,8 +46,7 @@ build/
 *.mp4
 *.avi
 
-# Generated output (PDFs and images derived from scripts)
-*.pdf
+# Generated output images derived from scripts
 *.png
 
 # Editor
